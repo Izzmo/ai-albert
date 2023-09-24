@@ -1,0 +1,48 @@
+﻿@page "/"
+@using System.Text.Json;
+@using System.Text.RegularExpressions;
+@using System.Web;
+@inject HttpClient Http
+
+<PageTitle>AIbert</PageTitle>
+
+<h1>Chat with AIbert</h1>
+
+<p><InputText @bind-Value="prompt"></InputText><button @onclick="SubmitChat">Submit</button></p>
+
+<h2>Chat:</h2>
+@foreach (var chat in chatHistory)
+{
+    <p>
+        @((MarkupString)Regex.Replace(
+            HttpUtility.HtmlEncode(@chat), "\r?\n|\r", "<br />"))
+    </p>
+}
+
+@code {
+    private string prompt = string.Empty;
+    private List<string> chatHistory = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Http.BaseAddress = new Uri("https://devaibert.azurewebsites.net/api/");
+    }
+
+    private async Task SubmitChat()
+    {
+        var input = new
+        {
+            input = prompt
+        };
+
+        try
+        {
+            using var res = await Http.PostAsJsonAsync("Chat", input);
+            chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+}
