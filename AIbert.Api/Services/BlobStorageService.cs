@@ -12,19 +12,37 @@ public class BlobStorageService
         _client = new BlobContainerClient(connectionString, containerName);
     }
 
-    public async Task<string> GetSystemPrompt()
+    public Task<string> GetSystemPrompt()
+        => Get("system-prompt.txt");
+
+    public Task SaveSystemPrompt(string newContent)
+        => Save("system-prompt.txt", newContent.ToString());
+
+    public async Task<decimal> GetTopP()
+        => decimal.Parse(await Get("topp.txt"));
+
+    public Task SaveTopP(decimal newContent)
+        => Save("topp.txt", newContent.ToString());
+
+    public async Task<decimal> GetTemperature()
+        => decimal.Parse(await Get("temperature.txt"));
+
+    public Task SaveTemperature(decimal newContent)
+        => Save("temperature.txt", newContent.ToString());
+
+    private async Task<string> Get(string filename)
     {
-        BlobClient blobClient = _client.GetBlobClient("system-prompt.txt");
+        BlobClient blobClient = _client.GetBlobClient(filename);
         using MemoryStream memoryStream = new();
         await blobClient.DownloadToAsync(memoryStream);
-        return System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
+        return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
 
-    public async Task SaveSystemPrompt(string newContent)
+    private Task Save(string filename, string newContent)
     {
-        BlobClient blobClient = _client.GetBlobClient("system-prompt.txt");
+        BlobClient blobClient = _client.GetBlobClient(filename);
         byte[] content = Encoding.UTF8.GetBytes(newContent);
         using MemoryStream memoryStream = new(content);
-        await blobClient.UploadAsync(memoryStream, true);
+        return blobClient.UploadAsync(memoryStream, true);
     }
 }

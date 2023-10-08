@@ -82,6 +82,8 @@ public class ChatFunction
 
         var kernel = builder.Build();
         var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
+        var topP = await _blobStorageService.GetTopP();
+        var temperature = await _blobStorageService.GetTemperature();
         string skPrompt = @$"{prompt}
 
 {{$history}}
@@ -93,8 +95,8 @@ AIbert:";
             Completion =
             {
                 MaxTokens = 2000,
-                Temperature = 0.0,
-                TopP = 1,
+                Temperature = (double)temperature,
+                TopP = (double)topP,
             }
         };
 

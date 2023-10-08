@@ -2,6 +2,7 @@
 @using System.Text.Json;
 @using System.Text.RegularExpressions;
 @using System.Web;
+@using AIbert.Models;
 @using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 @inject IWebAssemblyHostEnvironment env;
@@ -13,30 +14,37 @@
 
 <MudGrid>
     <MudItem md="6" xs="12">
-            <MudText Typo="Typo.h4">Settings</MudText>
-            <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" @bind-Value="systemPrompt" Lines="30" /></p>
-            <p>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSystemPrompt">Save system prompt</MudButton>
+        <MudText Typo="Typo.h4">Settings</MudText>
+        <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" @bind-Value="systemPrompt" Lines="30" /></p>
+        
+        <p>
+            <MudSlider @bind-Value="temperature" T="decimal" Min="0.0m" Max="2.0m" Step="0.1m" TickMarks="true" Color="Color.Primary">Temperature: @temperature.ToString()</MudSlider>
+        </p>
+        <p>
+            <MudSlider @bind-Value="topP" T="decimal" Min="0.0m" Max="1.0m" Step="0.1m" TickMarks="true" Color="Color.Primary">Top P: @topP.ToString()</MudSlider>
+        </p>
+
+        @*<MudText Typo="Typo.h4">Example responses</MudText>
+        <p><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExampleResponse">+ Add example response</MudButton></p>
+        <ul>
+            @foreach (var response in exampleResponses)
+            {
+                <li>
+                    @((MarkupString)Regex.Replace(
+                        HttpUtility.HtmlEncode(@response.question), "\r?\n|\r", "<br />"))
+                    <br />
+                    @((MarkupString)Regex.Replace(
+                        HttpUtility.HtmlEncode(@response.answer), "\r?\n|\r", "<br />"))
+                </li>
+            }
+        </ul>*@
+        <p>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettings">Save settings</MudButton>
             @if (isSaving)
             {
                 <MudText>Saving...</MudText>
             }
-            </p>
-
-            @*<MudText Typo="Typo.h4">Example responses</MudText>
-            <p><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExampleResponse">+ Add example response</MudButton></p>
-            <ul>
-                @foreach (var response in exampleResponses)
-                {
-                    <li>
-                        @((MarkupString)Regex.Replace(
-                            HttpUtility.HtmlEncode(@response.question), "\r?\n|\r", "<br />"))
-                        <br />
-                        @((MarkupString)Regex.Replace(
-                            HttpUtility.HtmlEncode(@response.answer), "\r?\n|\r", "<br />"))
-                    </li>
-                }
-            </ul>*@
+        </p>
     </MudItem>
 
     <MudItem md="6" xs="12">
@@ -44,8 +52,11 @@
             <MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined" Lines="3" />
         </p>
         <p>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="ClearChat">Clear chat</MudButton>
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Filled">
+                <MudButton Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton>
+                <MudButton Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Clear" IconColor="Color.Warning" OnClick="ClearChat">Clear chat</MudButton>
+            </MudButtonGroup>
+
         @if (isSending)
         {
             <MudText>Sending...</MudText>
@@ -67,6 +78,8 @@
 @code {
     private string prompt = string.Empty;
     private string systemPrompt = string.Empty;
+    private decimal temperature = 0.0m;
+    private decimal topP = 0.0m;
     private bool isSaving = true;
     private bool isSending = false;
 
@@ -77,7 +90,7 @@
     {
         var baseUrl = env.IsDevelopment() ? "http://localhost:7143" : "https://devaibert.azurewebsites.net";
         Http.BaseAddress = new Uri($"{baseUrl}/api/");
-        await GetSystemPrompt();
+        await GetSettings();
         await GetChat();
     }
 
@@ -86,12 +99,14 @@
 
     }
 
-    private async Task GetSystemPrompt()
+    private async Task GetSettings()
     {
         try
         {
-            var res = await Http.GetStringAsync("SystemPrompt");
-            systemPrompt = res;
+            var res = await Http.GetFromJsonAsync<Settings>("Settings");
+            systemPrompt = res?.SystemPrompt ?? string.Empty;
+            topP = res?.TopP ?? 0.0m;
+            temperature = res?.Temperature ?? 0.0m;
         }
         catch (Exception ex)
         {
@@ -103,18 +118,17 @@
         }
     }
 
-    private async Task SaveSystemPrompt()
+    private async Task SaveSettings()
     {
-        var input = new
-        {
-            input = systemPrompt
-        };
+        Settings settings = new(systemPrompt, topP, temperature);
 
         isSaving = true;
 
         try
         {
-            using var res = await Http.PutAsJsonAsync("SystemPrompt", input);
+            var options = new JsonSerializerOptions();
+            options.PropertyNamingPolicy = null;
+            using var res = await Http.PutAsJsonAsync("Settings", settings, options);
         }
         catch (Exception ex)
         {
@@ -139,6 +153,7 @@
         {
             using var res = await Http.PostAsJsonAsync("Chat", input);
             chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+            prompt = string.Empty;
         }
         catch (Exception ex)
         {
