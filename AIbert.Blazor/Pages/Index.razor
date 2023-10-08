@@ -78,6 +78,7 @@
         var baseUrl = env.IsDevelopment() ? "http://localhost:7143" : "https://devaibert.azurewebsites.net";
         Http.BaseAddress = new Uri($"{baseUrl}/api/");
         await GetSystemPrompt();
+        await GetChat();
     }
 
     private void AddExampleResponse()
@@ -138,6 +139,25 @@
         {
             using var res = await Http.PostAsJsonAsync("Chat", input);
             chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task GetChat()
+    {
+        isSending = true;
+
+        try
+        {
+            var res = await Http.GetStringAsync("Chat");
+            chatHistory = new List<string>(res.Split(','));
         }
         catch (Exception ex)
         {

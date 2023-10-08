@@ -51,6 +51,17 @@ public class ChatFunction
         return response;
     }
 
+    [Function("GetChat")]
+    public async Task<HttpResponseData> GetChatAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Chat")] HttpRequestData req)
+    {
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+
+        response.WriteString(string.Join("\n", _history));
+
+        return response;
+    }
+
     [Function("ClearChat")]
     public static HttpResponseData ClearChat([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "Chat")] HttpRequestData req)
     {
