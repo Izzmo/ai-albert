@@ -22,7 +22,7 @@ public class ChatFunction
     {
         _logger = loggerFactory.CreateLogger<ChatFunction>();
         _config = config;
-        _blobStorageService = new BlobStorageService(config.GetConnectionString("AzStorage"), "config");
+        _blobStorageService = new BlobStorageService(config.GetValue<string>("AzureWebJobsStorage"), "config");
     }
 
     [Function("Chat")]
@@ -72,8 +72,8 @@ AIbert:";
             Completion =
             {
                 MaxTokens = 2000,
-                Temperature = 0.7,
-                TopP = 0.5,
+                Temperature = 0.0,
+                TopP = 1,
             }
         };
 
