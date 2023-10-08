@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Api", "AIbert.Api\AI
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Blazor", "AIbert.Blazor\AIbert.Blazor.csproj", "{481671B4-63A2-487D-9F50-3166489C18BB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIbert.Models", "AIbert.Models\AIbert.Models.csproj", "{35B9E0AB-EB1D-4E55-84E3-D27A5985E19C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Models", "AIbert.Models\AIbert.Models.csproj", "{35B9E0AB-EB1D-4E55-84E3-D27A5985E19C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,0 +1,51 @@
+{
+	"navigationFallback": {
+		"rewrite": "/index.html"
+	},
+	"platform": {
+		"apiRuntime": "dotnet-isolated:6.0"
+	},
+	"trailingSlash": "auto",
+	"routes": [
+		{
+			"route": "/api/*",
+			"allowedRoles": [ "authenticated" ]
+		},
+		{
+			"route": "/login",
+			"rewrite": "/.auth/login/aad"
+		},
+		{
+			"route": "/logout",
+			"redirect": "/.auth/logout"
+		},
+		{
+			"route": "/.auth/login/twitter",
+			"statusCode": 404
+		},
+		{
+			"route": "/",
+			"allowedRoles": [ "authenticated" ],
+			"rewrite": "/index.html"
+		},
+		{
+			"route": "/{**catchall}",
+			"allowedRoles": [
+				"authenticated"
+			],
+			"rewrite": "/index.html"
+		}
+	],
+	"globalHeaders": {
+		"content-security-policy": "default-src https: 'unsafe-eval' 'unsafe-inline'; object-src 'none'"
+	},
+	"mimeTypes": {
+		".json": "text/json"
+	},
+	"responseOverrides": {
+		"401": {
+			"redirect": "/login",
+			"statusCode": 302
+		}
+	}
+}
