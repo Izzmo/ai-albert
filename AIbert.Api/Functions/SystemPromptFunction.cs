@@ -11,14 +11,11 @@ namespace AIbert.Api.Functions;
 public class SystemPromptFunction
 {
     private readonly ILogger _logger;
-    private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
-    private static readonly List<string> _history = new();
 
     public SystemPromptFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
         _logger = loggerFactory.CreateLogger<SystemPromptFunction>();
-        _config = config;
         _blobStorageService = new BlobStorageService(config.GetValue<string>("AzureWebJobsStorage"), "config");
     }
 
