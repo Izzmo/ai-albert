@@ -14,7 +14,7 @@
 <MudGrid>
     <MudItem sm="6">
             <MudText Typo="Typo.h4">Settings</MudText>
-            <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" Text="@systemPrompt" Lines="5" /></p>
+            <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" @bind-Value="systemPrompt" Lines="5" /></p>
             <p>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSystemPrompt">Save system prompt</MudButton>
             @if (isSaving)
@@ -40,7 +40,15 @@
     </MudItem>
 
     <MudItem sm="6">
-        <p><MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined"></MudTextField><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton></p>
+        <p>
+            <MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined" Lines="3" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="ClearChat">Clear chat</MudButton>
+        </p>
+        @if (isSending)
+        {
+            <MudText>Sending...</MudText>
+        }
 
         <MudText Typo="Typo.h4">Chat</MudText>
         @foreach (var chat in chatHistory)
@@ -58,6 +66,7 @@
     private string prompt = string.Empty;
     private string systemPrompt = string.Empty;
     private bool isSaving = true;
+    private bool isSending = true;
 
     private List<(string question, string answer)> exampleResponses = new();
     private List<string> chatHistory = new();
@@ -95,7 +104,7 @@
     {
         var input = new
         {
-            input = prompt
+            input = systemPrompt
         };
 
         isSaving = true;
@@ -121,10 +130,29 @@
             input = prompt
         };
 
+        isSending = true;
+
         try
         {
             using var res = await Http.PostAsJsonAsync("Chat", input);
             chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task ClearChat()
+    {
+        try
+        {
+            using var res = await Http.DeleteAsync("Chat");
+            chatHistory.Clear();
         }
         catch (Exception ex)
         {

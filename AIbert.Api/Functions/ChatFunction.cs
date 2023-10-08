@@ -26,7 +26,7 @@ public class ChatFunction
     }
 
     [Function("Chat")]
-    public async Task<HttpResponseData> ChatAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+    public async Task<HttpResponseData> ChatAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "Chat")] HttpRequestData req)
     {
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
         var data = JsonSerializer.Deserialize<ChatInput>(dataToBeSaved);
@@ -47,6 +47,16 @@ public class ChatFunction
         {
             _logger.LogError(ex, "Error with chat.");
         }
+
+        return response;
+    }
+
+    [Function("ClearChat")]
+    public static HttpResponseData ClearChat([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "Chat")] HttpRequestData req)
+    {
+        var response = req.CreateResponse(HttpStatusCode.OK);
+
+        _history.Clear();
 
         return response;
     }

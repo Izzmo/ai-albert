@@ -23,7 +23,7 @@ public class SystemPromptFunction
     }
 
     [Function("GetSystemPrompt")]
-    public async Task<HttpResponseData> GetSystemPromptAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req)
+    public async Task<HttpResponseData> GetSystemPromptAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "SystemPrompt")] HttpRequestData req)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
@@ -42,7 +42,7 @@ public class SystemPromptFunction
     }
 
     [Function("PutSystemPrompt")]
-    public async Task<HttpResponseData> UpdateSystemPromptAsync([HttpTrigger(AuthorizationLevel.Anonymous, "put")] HttpRequestData req)
+    public async Task<HttpResponseData> UpdateSystemPromptAsync([HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "SystemPrompt")] HttpRequestData req)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
