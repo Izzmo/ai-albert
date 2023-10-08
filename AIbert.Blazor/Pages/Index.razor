@@ -2,30 +2,116 @@
 @using System.Text.Json;
 @using System.Text.RegularExpressions;
 @using System.Web;
-@inject HttpClient Http
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+
+@inject IWebAssemblyHostEnvironment env;
+@inject HttpClient Http;
 
 <PageTitle>AIbert</PageTitle>
 
-<h1>Chat with AIbert</h1>
+<MudText Typo="Typo.h2">Chat with AIbert</MudText>
 
-<p><InputText @bind-Value="prompt"></InputText><button @onclick="SubmitChat">Submit</button></p>
+<MudGrid>
+    <MudItem sm="6">
+            <MudText Typo="Typo.h4">Settings</MudText>
+            <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" Text="@systemPrompt" Lines="5" /></p>
+            <p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSystemPrompt">Save system prompt</MudButton>
+            @if (isSaving)
+            {
+                <MudText>Saving...</MudText>
+            }
+            </p>
 
-<h2>Chat:</h2>
-@foreach (var chat in chatHistory)
-{
-    <p>
-        @((MarkupString)Regex.Replace(
-            HttpUtility.HtmlEncode(@chat), "\r?\n|\r", "<br />"))
-    </p>
-}
+            <MudText Typo="Typo.h4">Example responses</MudText>
+            <p><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExampleResponse">+ Add example response</MudButton></p>
+            <ul>
+                @foreach (var response in exampleResponses)
+                {
+                    <li>
+                        @((MarkupString)Regex.Replace(
+                            HttpUtility.HtmlEncode(@response.question), "\r?\n|\r", "<br />"))
+                        <br />
+                        @((MarkupString)Regex.Replace(
+                            HttpUtility.HtmlEncode(@response.answer), "\r?\n|\r", "<br />"))
+                    </li>
+                }
+            </ul>
+    </MudItem>
+
+    <MudItem sm="6">
+        <p><MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined"></MudTextField><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton></p>
+
+        <MudText Typo="Typo.h4">Chat</MudText>
+        @foreach (var chat in chatHistory)
+        {
+            <p>
+                @((MarkupString)Regex.Replace(
+                    HttpUtility.HtmlEncode(@chat), "\r?\n|\r", "<br />"))
+            </p>
+        }
+
+    </MudItem>
+</MudGrid>
 
 @code {
     private string prompt = string.Empty;
-    private List<string> chatHistory = new List<string>();
+    private string systemPrompt = string.Empty;
+    private bool isSaving = true;
+
+    private List<(string question, string answer)> exampleResponses = new();
+    private List<string> chatHistory = new();
 
     protected override async Task OnInitializedAsync()
     {
-        Http.BaseAddress = new Uri("https://devaibert.azurewebsites.net/api/");
+        var baseUrl = env.IsDevelopment() ? "http://localhost:7143" : "https://devaibert.azurewebsites.net";
+        Http.BaseAddress = new Uri($"{baseUrl}/api/");
+        await GetSystemPrompt();
+    }
+
+    private void AddExampleResponse()
+    {
+
+    }
+
+    private async Task GetSystemPrompt()
+    {
+        try
+        {
+            var res = await Http.GetStringAsync("SystemPrompt");
+            systemPrompt = res;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveSystemPrompt()
+    {
+        var input = new
+        {
+            input = prompt
+        };
+
+        isSaving = true;
+
+        try
+        {
+            using var res = await Http.PutAsJsonAsync("SystemPrompt", input);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
 
     private async Task SubmitChat()
