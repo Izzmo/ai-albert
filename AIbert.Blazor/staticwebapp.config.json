@@ -27,13 +27,6 @@
 			"route": "/",
 			"allowedRoles": [ "authenticated" ],
 			"rewrite": "/index.html"
-		},
-		{
-			"route": "/{**catchall}",
-			"allowedRoles": [
-				"authenticated"
-			],
-			"rewrite": "/index.html"
 		}
 	],
 	"globalHeaders": {
