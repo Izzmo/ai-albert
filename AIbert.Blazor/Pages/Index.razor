@@ -23,7 +23,7 @@
             }
             </p>
 
-            <MudText Typo="Typo.h4">Example responses</MudText>
+            @*<MudText Typo="Typo.h4">Example responses</MudText>
             <p><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExampleResponse">+ Add example response</MudButton></p>
             <ul>
                 @foreach (var response in exampleResponses)
@@ -36,7 +36,7 @@
                             HttpUtility.HtmlEncode(@response.answer), "\r?\n|\r", "<br />"))
                     </li>
                 }
-            </ul>
+            </ul>*@
     </MudItem>
 
     <MudItem sm="6">
@@ -66,7 +66,7 @@
     private string prompt = string.Empty;
     private string systemPrompt = string.Empty;
     private bool isSaving = true;
-    private bool isSending = true;
+    private bool isSending = false;
 
     private List<(string question, string answer)> exampleResponses = new();
     private List<string> chatHistory = new();
