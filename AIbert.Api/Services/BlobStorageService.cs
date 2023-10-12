@@ -16,7 +16,7 @@ public class BlobStorageService
         => Get("system-prompt.txt");
 
     public Task SaveSystemPrompt(string newContent)
-        => Save("system-prompt.txt", newContent.ToString());
+        => Save("system-prompt.txt", newContent);
 
     public async Task<decimal> GetTopP()
         => decimal.Parse(await Get("topp.txt"));
@@ -38,11 +38,11 @@ public class BlobStorageService
         return Encoding.UTF8.GetString(memoryStream.ToArray());
     }
 
-    private Task Save(string filename, string newContent)
+    private async Task Save(string filename, string newContent)
     {
         BlobClient blobClient = _client.GetBlobClient(filename);
         byte[] content = Encoding.UTF8.GetBytes(newContent);
         using MemoryStream memoryStream = new(content);
-        return blobClient.UploadAsync(memoryStream, true);
+        await blobClient.UploadAsync(memoryStream, true);
     }
 }

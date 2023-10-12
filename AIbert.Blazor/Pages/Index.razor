@@ -88,8 +88,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var baseUrl = env.IsDevelopment() ? "http://localhost:7143" : "https://devaibert.azurewebsites.net";
-        Http.BaseAddress = new Uri($"{baseUrl}/api/");
         await GetSettings();
         await GetChat();
     }
@@ -103,7 +101,7 @@
     {
         try
         {
-            var res = await Http.GetFromJsonAsync<Settings>("Settings");
+            var res = await Http.GetFromJsonAsync<Settings>("/api/Settings");
             systemPrompt = res?.SystemPrompt ?? string.Empty;
             topP = res?.TopP ?? 0.0m;
             temperature = res?.Temperature ?? 0.0m;
@@ -128,7 +126,7 @@
         {
             var options = new JsonSerializerOptions();
             options.PropertyNamingPolicy = null;
-            using var res = await Http.PutAsJsonAsync("Settings", settings, options);
+            using var res = await Http.PutAsJsonAsync("/api/Settings", settings, options);
         }
         catch (Exception ex)
         {
@@ -151,7 +149,7 @@
 
         try
         {
-            using var res = await Http.PostAsJsonAsync("Chat", input);
+            using var res = await Http.PostAsJsonAsync("/api/Chat", input);
             chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
             prompt = string.Empty;
         }
@@ -171,7 +169,7 @@
 
         try
         {
-            var res = await Http.GetStringAsync("Chat");
+            var res = await Http.GetStringAsync("/api/Chat");
             chatHistory = new List<string>(res.Split(','));
         }
         catch (Exception ex)
@@ -188,7 +186,7 @@
     {
         try
         {
-            using var res = await Http.DeleteAsync("Chat");
+            using var res = await Http.DeleteAsync("/api/Chat");
             chatHistory.Clear();
         }
         catch (Exception ex)

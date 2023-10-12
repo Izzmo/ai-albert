@@ -49,7 +49,7 @@ public class SettingsFunction
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
         var data = JsonSerializer.Deserialize<Settings>(dataToBeSaved);
 
-        if (data == null)
+        if (data == null || string.IsNullOrWhiteSpace(data.SystemPrompt))
         {
             return req.CreateResponse(HttpStatusCode.BadRequest);
         }
