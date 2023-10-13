@@ -25,7 +25,6 @@
 		},
 		{
 			"route": "/",
-			"allowedRoles": [ "authenticated" ],
 			"rewrite": "/index.html"
 		}
 	],
