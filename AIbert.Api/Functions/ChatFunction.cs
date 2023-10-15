@@ -84,11 +84,7 @@ public class ChatFunction
         var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
         var topP = await _blobStorageService.GetTopP();
         var temperature = await _blobStorageService.GetTemperature();
-        string skPrompt = @$"{prompt}
-
-{{$history}}
-User: {{$userInput}}
-AIbert:";
+        string skPrompt = @$"{prompt}";
 
         var promptConfig = new PromptTemplateConfig
         {

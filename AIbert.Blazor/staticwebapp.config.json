@@ -8,8 +8,7 @@
 	"trailingSlash": "auto",
 	"routes": [
 		{
-			"route": "/api/*",
-			"allowedRoles": [ "authenticated" ]
+			"route": "/api/*"
 		},
 		{
 			"route": "/login",
