@@ -17,7 +17,7 @@ public class SettingsFunction
     public SettingsFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
         _logger = loggerFactory.CreateLogger<SettingsFunction>();
-        _blobStorageService = new BlobStorageService(config.GetValue<string>("AzureWebJobsStorage"), "config");
+        _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
     }
 
     [Function("GetSettings")]
