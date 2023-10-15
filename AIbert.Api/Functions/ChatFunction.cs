@@ -22,7 +22,7 @@ public class ChatFunction
     {
         _logger = loggerFactory.CreateLogger<ChatFunction>();
         _config = config;
-        _blobStorageService = new BlobStorageService(config.GetValue<string>("AzureWebJobsStorage"), "config");
+        _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
     }
 
     [Function("Chat")]
