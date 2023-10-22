@@ -60,9 +60,12 @@
             <MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined" Lines="3" />
         </p>
         <p>
-            <MudButtonGroup Color="Color.Primary" Variant="Variant.Filled">
-                <MudButton Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton>
-                <MudButton Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Clear" IconColor="Color.Warning" OnClick="ClearChat">Clear chat</MudButton>
+            <MudButtonGroup OverrideStyles="false" VerticalAlign="true">
+                <MudButtonGroup OverrideStyles="false">
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.PostAdd" OnClick="AddChat">Add chat</MudButton>
+                    <MudButton Color="Color.Secondary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Clear" IconColor="Color.Warning" OnClick="ClearChat">Clear chat</MudButton>
+                </MudButtonGroup>
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" IconColor="Color.Primary" OnClick="SubmitChat">Upload chat</MudButton>
             </MudButtonGroup>
         </p>
 
@@ -180,9 +183,20 @@
         }
     }
 
+    private void AddChat()
+    {
+        chatHistory.Add($"{sender}: {prompt}");
+        prompt = string.Empty;
+    }
+
     private async Task SubmitChat()
     {
-        ChatInput input = new(prompt, sender, participant2);
+        if (prompt.Length > 0)
+        {
+            chatHistory.Add($"{sender}: {prompt}");
+
+        }
+        ChatInput input = new(chatHistory);
 
         isSending = true;
 

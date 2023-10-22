@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security;
 using System.Text.Json;
 using AIbert.Api.Services;
 using AIbert.Models;
@@ -34,7 +35,7 @@ public class ChatFunction
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
         var data = JsonSerializer.Deserialize<ChatInput>(dataToBeSaved);
 
-        if (data == null || string.IsNullOrWhiteSpace(data.input))
+        if (data == null || data.thread.Count == 0)
         {
             return req.CreateResponse(HttpStatusCode.BadRequest);
         }
@@ -44,7 +45,7 @@ public class ChatFunction
 
         try
         {
-            await Chat(data.input, data.sender, data.participant2);
+            await Chat(data.thread);
             response.WriteString(JsonSerializer.Serialize(new ChatResponse(_history, _promises)));
         }
         catch (Exception ex)
@@ -86,7 +87,7 @@ public class ChatFunction
         return response;
     }
 
-    private async Task Chat(string input, string sender, string participant2)
+    private async Task Chat(List<string> thread)
     {
         var builder = new KernelBuilder();
 
@@ -116,13 +117,13 @@ public class ChatFunction
 
         var context = kernel.CreateNewContext();
 
-        var userInput = input;
-        context.Variables["userInput"] = userInput;
-
-        context.Variables["participants"] = string.Join(",", sender, participant2);
-
-        _history.Add($"{sender}: {userInput}");
+        _history.Clear();
+        _history.AddRange(thread);
         context.Variables["history"] = JsonSerializer.Serialize(_history);
+
+        var participants = new List<string>();
+        _history.ForEach(t => participants.Add(t.Split(":")[0]));
+        context.Variables["participants"] = string.Join(",", participants.Distinct());
 
         try
         {
