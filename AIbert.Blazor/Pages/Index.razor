@@ -48,6 +48,14 @@
     </MudItem>
 
     <MudItem md="6" xs="12">
+        <MudText Typo="Typo.h4">Participants</MudText>
+        <p>
+            <MudTextField T="string" Label="From (You): Participant 1" Variant="Variant.Outlined" @bind-Value="sender" />
+            <MudButton ButtonType="ButtonType.Button" Color="Color.Surface" Variant="Variant.Filled" OnClick="SwapParticipants">Swap</MudButton>
+            <MudTextField T="string" Label="To: Participant 2" Variant="Variant.Outlined" @bind-Value="participant2" />
+        </p>
+
+        <MudText Typo="Typo.h4">Your Message</MudText>
         <p>
             <MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined" Lines="3" />
         </p>
@@ -56,19 +64,41 @@
                 <MudButton Color="Color.Primary" OnClick="SubmitChat">Submit chat</MudButton>
                 <MudButton Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Clear" IconColor="Color.Warning" OnClick="ClearChat">Clear chat</MudButton>
             </MudButtonGroup>
+        </p>
 
         @if (isSending)
         {
-            <MudText>Sending...</MudText>
+            <p>
+                <MudText>Sending...</MudText>
+                <br />
+            </p>
         }
-        </p>
 
-        <MudText Typo="Typo.h4">Chat</MudText>
+        <div class="promises">
+        <MudText Typo="Typo.h5">Promises</MudText>
+        @if (promises.Count == 0)
+        {
+            <p><i>No promises</i></p>
+        }
+        else
+        {
+            <ol>
+            @foreach (var promise in promises)
+            {
+                <li>@JsonSerializer.Serialize(promise)</li>
+            }
+            </ol>
+            <MudButton StartIcon="@Icons.Material.Filled.Clear" IconColor="Color.Warning" Variant="Variant.Outlined" OnClick="ClearPromises">Clear promises</MudButton>
+        }
+        </div>
+
+        <MudText Typo="Typo.h4">Thread</MudText>
         @foreach (var chat in chatHistory)
         {
-            <p>
-                @((MarkupString)Regex.Replace(
-                    HttpUtility.HtmlEncode(@chat), "\r?\n|\r", "<br />"))
+            var chatParts = chat.Split(":");
+            <p class="chat @((chat.StartsWith("AIbert") ? "chat--aibert" : ""))">
+                <span class="chat--person">@chatParts[0]</span>: @((MarkupString)Regex.Replace(
+                    HttpUtility.HtmlEncode(@chatParts[1]), "\r?\n|\r", "<br />"))
             </p>
         }
 
@@ -77,14 +107,19 @@
 
 @code {
     private string prompt = string.Empty;
+    private string sender = string.Empty;
+    private string participant2 = string.Empty;
     private string systemPrompt = string.Empty;
     private decimal temperature = 0.0m;
     private decimal topP = 0.0m;
     private bool isSaving = true;
     private bool isSending = false;
 
+    private const string baseUrl = "http://localhost:7143/api/";
+
     private List<(string question, string answer)> exampleResponses = new();
     private List<string> chatHistory = new();
+    private List<Promise> promises = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,11 +132,18 @@
 
     }
 
+    private void SwapParticipants()
+    {
+        var temp = sender;
+        sender = participant2;
+        participant2 = temp;
+    }
+
     private async Task GetSettings()
     {
         try
         {
-            var res = await Http.GetFromJsonAsync<Settings>("/api/Settings");
+            var res = await Http.GetFromJsonAsync<Settings>($"{baseUrl}Settings");
             systemPrompt = res?.SystemPrompt ?? string.Empty;
             topP = res?.TopP ?? 0.0m;
             temperature = res?.Temperature ?? 0.0m;
@@ -126,7 +168,7 @@
         {
             var options = new JsonSerializerOptions();
             options.PropertyNamingPolicy = null;
-            using var res = await Http.PutAsJsonAsync("/api/Settings", settings, options);
+            using var res = await Http.PutAsJsonAsync($"{baseUrl}Settings", settings, options);
         }
         catch (Exception ex)
         {
@@ -140,17 +182,16 @@
 
     private async Task SubmitChat()
     {
-        var input = new
-        {
-            input = prompt
-        };
+        ChatInput input = new(prompt, sender, participant2);
 
         isSending = true;
 
         try
         {
-            using var res = await Http.PostAsJsonAsync("/api/Chat", input);
-            chatHistory = await res.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+            using var res = await Http.PostAsJsonAsync($"{baseUrl}Chat", input);
+            var chatRes = await res.Content.ReadFromJsonAsync<ChatResponse>();
+            chatHistory = chatRes?.thread ?? new();
+            promises = chatRes?.promises ?? new();
             prompt = string.Empty;
         }
         catch (Exception ex)
@@ -169,8 +210,10 @@
 
         try
         {
-            var res = await Http.GetStringAsync("/api/Chat");
-            chatHistory = new List<string>(res.Split(','));
+            var res = await Http.GetStringAsync($"{baseUrl}Chat");
+            var chatRes = JsonSerializer.Deserialize<ChatResponse>(res);
+            chatHistory = chatRes?.thread ?? new();
+            promises = chatRes?.promises ?? new();
         }
         catch (Exception ex)
         {
@@ -186,8 +229,21 @@
     {
         try
         {
-            using var res = await Http.DeleteAsync("/api/Chat");
+            using var res = await Http.DeleteAsync($"{baseUrl}Chat");
             chatHistory.Clear();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    private async Task ClearPromises()
+    {
+        try
+        {
+            using var res = await Http.DeleteAsync($"{baseUrl}Promise");
+            promises.Clear();
         }
         catch (Exception ex)
         {

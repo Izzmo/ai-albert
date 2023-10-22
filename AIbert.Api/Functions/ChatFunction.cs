@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AIbert.Api.Services;
+using AIbert.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -9,7 +10,8 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.SemanticFunctions;
 
 namespace AIbert.Api.Functions;
-public record ChatInput(string input);
+
+public record Answer(string promise, string promisor, string promiseHolder, string deadline, string response, string confirmed);
 
 public class ChatFunction
 {
@@ -17,6 +19,7 @@ public class ChatFunction
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
     private static readonly List<string> _history = new();
+    private static readonly List<Promise> _promises = new();
 
     public ChatFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
@@ -41,7 +44,8 @@ public class ChatFunction
 
         try
         {
-            response.WriteString(await Chat(data.input));
+            await Chat(data.input, data.sender, data.participant2);
+            response.WriteString(JsonSerializer.Serialize(new ChatResponse(_history, _promises)));
         }
         catch (Exception ex)
         {
@@ -57,7 +61,7 @@ public class ChatFunction
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
-        await response.WriteStringAsync(string.Join("\n", _history));
+        await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse(_history, _promises)));
 
         return response;
     }
@@ -72,7 +76,17 @@ public class ChatFunction
         return response;
     }
 
-    private async Task<string> Chat(string input)
+    [Function("ClearPromises")]
+    public static HttpResponseData ClearPromises([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "Promise")] HttpRequestData req)
+    {
+        var response = req.CreateResponse(HttpStatusCode.OK);
+
+        _promises.Clear();
+
+        return response;
+    }
+
+    private async Task Chat(string input, string sender, string participant2)
     {
         var builder = new KernelBuilder();
 
@@ -101,15 +115,35 @@ public class ChatFunction
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
         var context = kernel.CreateNewContext();
-        context.Variables["history"] = string.Join("\n", _history);
 
         var userInput = input;
         context.Variables["userInput"] = userInput;
 
-        var bot_answer = await ask.InvokeAsync(context);
-        _history.Insert(0, $"\n\nUser: {userInput}\nAIbert: {bot_answer}\n");
-        context.Variables.Update(string.Join("\n", _history));
+        context.Variables["participants"] = string.Join(",", sender, participant2);
 
-        return JsonSerializer.Serialize(_history);
+        _history.Add($"{sender}: {userInput}");
+        context.Variables["history"] = JsonSerializer.Serialize(_history);
+
+        try
+        {
+            var bot_answer = await ask.InvokeAsync(context);
+            _logger.LogInformation($"AIbert: {bot_answer}");
+            var answer = JsonSerializer.Deserialize<Answer>(bot_answer.ToString());
+            context.Variables.Update(string.Join("\n", _history, "\nAIbert: ", answer, "\n"));
+
+            if (!string.IsNullOrEmpty(answer?.response))
+                _history.Add($"AIbert: {answer?.response}");
+
+            if (answer?.confirmed.ToLower() == "true")
+            {
+                _promises.Add(new Promise(Guid.NewGuid(), answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in parsing bot answer");
+        }
+        
+        context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(_promises)}";
     }
 }

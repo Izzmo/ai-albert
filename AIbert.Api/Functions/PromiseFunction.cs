@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace AIbert.Api.Functions;
 
 public record PromiseKeeper(Guid Id, string Name);
-public record Promise(Guid Id, string Description, DateTimeOffset Deadline, PromiseKeeper Promiser, PromiseKeeper Promisee);
+public record PromiseOld(Guid Id, string Description, DateTimeOffset Deadline, PromiseKeeper Promiser, PromiseKeeper Promisee);
 
 public class PromiseFunction
 {
@@ -26,7 +26,7 @@ public class PromiseFunction
 
         PromiseKeeper p1 = new(Guid.NewGuid(), "Nick");
         PromiseKeeper p2 = new(Guid.NewGuid(), "Brian");
-        List<Promise> promises = new()
+        List<PromiseOld> promises = new()
         {
             new (Guid.NewGuid(), "Respond to my email", DateTimeOffset.UtcNow.AddDays(1), p1, p2)
         };
@@ -40,7 +40,7 @@ public class PromiseFunction
     public async Task<HttpResponseData> PostPromiseAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
     {
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
-        var data = JsonSerializer.Deserialize<Promise>(dataToBeSaved);
+        var data = JsonSerializer.Deserialize<PromiseOld>(dataToBeSaved);
 
         if (data == null || data.Deadline <= DateTimeOffset.Now)
         {

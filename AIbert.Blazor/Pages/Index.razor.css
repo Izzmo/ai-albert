@@ -1,0 +1,29 @@
+.promises {
+	margin-bottom: 1em;
+}
+
+.promises ol {
+	padding-left: 1em;
+	margin: 1em 0;
+}
+
+.chat {
+	padding: 1em;
+	margin: 1em 0;
+}
+
+	.chat:not(.chat--aibert):nth-child(2n-1) {
+		text-align: right;
+		background-color: rgb(94, 24, 225);
+		color: white;
+	}
+
+.chat--person {
+	font-weight: bold;
+}
+
+.chat.chat--aibert {
+	font-style: italic;
+	background-color: rgb(0, 255, 177);
+	color: black;
+}
