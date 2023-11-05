@@ -7,6 +7,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Orchestration;
 using Microsoft.SemanticKernel.SemanticFunctions;
 
 namespace AIbert.Api.Functions;
@@ -99,33 +100,11 @@ public class ChatFunction
 
     private async Task Chat()
     {
-        var builder = new KernelBuilder();
-
-        builder.WithOpenAIChatCompletionService(
-                 "gpt-3.5-turbo",
-                 _config.GetValue<string>("OpenAiKey"));
-
-        var kernel = builder.Build();
+        IKernel kernel = GetKernel();
         var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
-        var topP = await _blobStorageService.GetTopP();
-        var temperature = await _blobStorageService.GetTemperature();
-        string skPrompt = @$"{prompt}";
+        var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
-        var promptConfig = new PromptTemplateConfig
-        {
-            Completion =
-            {
-                MaxTokens = 2000,
-                Temperature = (double)temperature,
-                TopP = (double)topP,
-            }
-        };
-
-        var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
-        var functionConfig = new SemanticFunctionConfig(promptConfig, promptTemplate);
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
-
-        var context = kernel.CreateNewContext();
 
         context.Variables["history"] = JsonSerializer.Serialize(_history);
 
@@ -190,33 +169,12 @@ public class ChatFunction
 
         _logger.LogInformation("Acknowledging message: {0}", _history.Last().MessageId);
         LastMessageAck = _history.Last().MessageId;
-        var builder = new KernelBuilder();
 
-        builder.WithOpenAIChatCompletionService(
-                 "gpt-3.5-turbo",
-                 _config.GetValue<string>("OpenAiKey"));
-
-        var kernel = builder.Build();
-        var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
-        var topP = await _blobStorageService.GetTopP();
-        var temperature = await _blobStorageService.GetTemperature();
+        IKernel kernel = GetKernel();
         string skPrompt = "Given the chat history below, is there a promise being made? If so, do you know the promisee, promise keeper, description of the promise, and the deadline of the promise? If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
+        var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
 
-        var promptConfig = new PromptTemplateConfig
-        {
-            Completion =
-            {
-                MaxTokens = 2000,
-                Temperature = (double)temperature,
-                TopP = (double)topP,
-            }
-        };
-
-        var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
-        var functionConfig = new SemanticFunctionConfig(promptConfig, promptTemplate);
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
-
-        var context = kernel.CreateNewContext();
 
         context.Variables["history"] = JsonSerializer.Serialize(_history);
 
@@ -250,5 +208,37 @@ public class ChatFunction
         }
 
         return chatMessages;
+    }
+
+    private async Task<(SKContext context, SemanticFunctionConfig config)> GetKernelBuilder(IKernel kernel, string prompt)
+    {
+        var topP = await _blobStorageService.GetTopP();
+        var temperature = await _blobStorageService.GetTemperature();
+        var promptConfig = new PromptTemplateConfig
+        {
+            Completion =
+            {
+                MaxTokens = 2000,
+                Temperature = (double)temperature,
+                TopP = (double)topP,
+            }
+        };
+        string skPrompt = @$"{prompt}";
+        var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
+        var functionConfig = new SemanticFunctionConfig(promptConfig, promptTemplate);
+
+        return (kernel.CreateNewContext(), functionConfig);
+    }
+
+    private IKernel GetKernel()
+    {
+        var builder = new KernelBuilder();
+
+        builder.WithOpenAIChatCompletionService(
+                 "gpt-3.5-turbo",
+                 _config.GetValue<string>("OpenAiKey"));
+
+        var kernel = builder.Build();
+        return kernel;
     }
 }
