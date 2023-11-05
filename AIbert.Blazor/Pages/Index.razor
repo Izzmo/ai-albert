@@ -123,7 +123,7 @@
     private bool isSaving = true;
     private bool isSending = false;
 
-    private const string baseUrl = "http://localhost:7143/api/"; //
+    private string baseUrl = "/api/";
 
     private List<(string question, string answer)> exampleResponses = new();
     private List<string> chatHistory = new();
@@ -131,6 +131,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (env.IsDevelopment())
+            baseUrl = "http://localhost:7143/api/";
+
         await GetSettings();
 
         var timer = new System.Threading.Timer(async _ =>
