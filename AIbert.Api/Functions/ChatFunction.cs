@@ -21,20 +21,45 @@ public record ChatMessage(Guid MessageId, DateTime Timestamp, string User, strin
     }
 }
 
+public class ThreadEntity : BaseEntity
+{
+    public string Users { get; set; } = string.Empty;
+    public string Chats { get; set; } = string.Empty;
+    public string Promises { get; set; } = string.Empty;
+
+    public static ThreadEntity ConvertFromChatThread(ChatThread thread)
+    {
+        return new ThreadEntity
+        {
+            PartitionKey = thread.threadId,
+            RowKey = thread.threadId,
+            Users = JsonSerializer.Serialize(thread.users),
+            Chats = JsonSerializer.Serialize(thread.chats),
+            Promises = JsonSerializer.Serialize(thread.promises),
+        };
+    }
+
+    public ChatThread ConvertTo()
+    {
+        return new ChatThread(
+            JsonSerializer.Deserialize<IList<Chat>>(Chats),
+            JsonSerializer.Deserialize<IList<Promise>>(Promises));
+    }
+}
+
 public class ChatFunction
 {
     private readonly ILogger _logger;
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
-    private static readonly List<ChatMessage> _history = new();
-    private static readonly List<Promise> _promises = new();
-    private static Guid LastMessageAck = Guid.Empty;
+    private readonly TableStorageService<ThreadEntity> _tableStorageService;
 
     public ChatFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
         _logger = loggerFactory.CreateLogger<ChatFunction>();
         _config = config;
         _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
+        _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
     }
 
     [Function("Chat")]
@@ -43,7 +68,7 @@ public class ChatFunction
         var dataToBeSaved = await new StreamReader(req.Body).ReadToEndAsync();
         var data = JsonSerializer.Deserialize<ChatInput>(dataToBeSaved);
 
-        if (data == null || data.thread.Count == 0)
+        if (data == null || data.thread == null)
         {
             return req.CreateResponse(HttpStatusCode.BadRequest);
         }
@@ -53,8 +78,8 @@ public class ChatFunction
 
         try
         {
-            _history.Clear();
-            _history.AddRange(GetChatMessages(data.thread));
+            data.thread.HasChangedSinceLastCheck = true;
+            await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(data.thread));
         }
         catch (Exception ex)
         {
@@ -65,25 +90,15 @@ public class ChatFunction
     }
 
     [Function("GetChat")]
-    public async Task<HttpResponseData> GetChatAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Chat")] HttpRequestData req)
+    public async Task<HttpResponseData> GetChatAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Chat/{threadId}")] HttpRequestData req, string threadId)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-        ShouldRespond();
-#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-        await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse(_history.Select(h => h.ToString()).ToList(), _promises)));
-
-        return response;
-    }
-
-    [Function("ClearChat")]
-    public static HttpResponseData ClearChat([HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "Chat")] HttpRequestData req)
-    {
-        var response = req.CreateResponse(HttpStatusCode.OK);
-
-        _history.Clear();
+        var threadEntity = (await _tableStorageService.SearchEntitiesAsync(x => x.RowKey == threadId)).First();
+        var thread = threadEntity.ConvertTo();
+        await ShouldRespond(thread);
+        await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse(thread)));
 
         return response;
     }
@@ -93,12 +108,12 @@ public class ChatFunction
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
 
-        _promises.Clear();
+        //_promises.Clear();
 
         return response;
     }
 
-    private async Task Chat()
+    private async Task Chat(ChatThread thread)
     {
         IKernel kernel = GetKernel();
         var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
@@ -106,10 +121,10 @@ public class ChatFunction
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
-        context.Variables["history"] = JsonSerializer.Serialize(_history);
+        context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
 
         var participants = new List<string>();
-        _history.ForEach(t => participants.Add(t.User));
+        thread.chats.ToList().ForEach(t => participants.Add(t.userId));
         context.Variables["participants"] = string.Join(",", participants.Distinct());
 
         try
@@ -117,14 +132,19 @@ public class ChatFunction
             var bot_answer = await ask.InvokeAsync(context);
             _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} AIbert:: {bot_answer}");
             var answer = JsonSerializer.Deserialize<Answer>(bot_answer.ToString());
-            context.Variables.Update(string.Join("\n", _history, "\nAIbert: ", answer, "\n"));
+            context.Variables.Update(string.Join("\n", thread.chats, "\nAIbert: ", answer, "\n"));
 
-            if (!string.IsNullOrEmpty(answer?.response))
-                _history.Add(new ChatMessage(Guid.Empty, DateTime.Now, "AIbert", answer.response));
-
-            if (answer?.confirmed.ToLower() == "true")
+            if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))
             {
-                _promises.Add(new Promise(Guid.NewGuid(), answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
+                thread.chats.Add(new Chat(Guid.Empty, answer.response, "AIbert", DateTime.Now));
+                thread.HasChangedSinceLastCheck = true;
+
+                if (answer?.confirmed.ToLower() == "true")
+                {
+                    thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
+                }
+                
+                await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
             }
         }
         catch (Exception ex)
@@ -132,10 +152,10 @@ public class ChatFunction
             _logger.LogError(ex, "Error in parsing bot answer");
         }
         
-        context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(_promises)}";
+        context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(thread.promises)}";
     }
 
-    private bool TimeBufferHasBeenReached(ChatMessage? lastMessage)
+    private bool TimeBufferHasBeenReached(Chat? lastMessage)
     {
         if (lastMessage == null)
         {
@@ -143,32 +163,25 @@ public class ChatFunction
             return false;
         }
 
-        if (Guid.Empty == lastMessage.MessageId)
+        if (Guid.Empty == lastMessage.chatId)
         {
             _logger.LogInformation("Not repsonding yet: Last message is AIbert.");
             return false;
         }
 
-        if (LastMessageAck == lastMessage.MessageId)
-        {
-            _logger.LogInformation("Not repsonding yet: Last message has already been acknowledged.");
-            return false;
-        }
-
-        _logger.LogInformation("{0} <= {1}", lastMessage.Timestamp, DateTime.Now.AddSeconds(-15));
-        return lastMessage.Timestamp <= DateTime.Now.AddSeconds(-15);
+        _logger.LogInformation("{0} <= {1}", lastMessage.timestamp, DateTime.Now.AddSeconds(-15));
+        return lastMessage.timestamp <= DateTime.Now.AddSeconds(-15);
     }
 
-    private async Task ShouldRespond()
+    private async Task ShouldRespond(ChatThread thread)
     {
-        if (!TimeBufferHasBeenReached(_history.LastOrDefault()))
+        if (thread.HasChangedSinceLastCheck || !TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
         {
             _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
             return;
         }
 
-        _logger.LogInformation("Acknowledging message: {0}", _history.Last().MessageId);
-        LastMessageAck = _history.Last().MessageId;
+        _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
 
         IKernel kernel = GetKernel();
         string skPrompt = "Given the chat history below, is there a promise being made? If so, do you know the promisee, promise keeper, description of the promise, and the deadline of the promise? If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
@@ -176,38 +189,18 @@ public class ChatFunction
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
-        context.Variables["history"] = JsonSerializer.Serialize(_history);
+        context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
 
         try
         {
             var bot_answer = await ask.InvokeAsync(context);
-            _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} AIbert:: {bot_answer}");
-            await Chat();
+            _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} should respond? AIbert:: {bot_answer}");
+            await Chat(thread);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in parsing bot answer");
         }
-    }
-
-    private static (DateTime timestamp, string user, string message) GetParts(string chatString)
-    {
-        var parts = chatString.Split("::");
-        var dateAuthorParts = parts[0].Split(" ");
-        return (DateTime.Parse($"{dateAuthorParts[0]} {dateAuthorParts[1]}"), dateAuthorParts[2], parts[1]);
-    }
-
-    private static List<ChatMessage> GetChatMessages(List<string> threads)
-    {
-        var chatMessages = new List<ChatMessage>();
-
-        foreach (var thread in threads)
-        {
-            var parts = GetParts(thread);
-            chatMessages.Add(new ChatMessage(Guid.NewGuid(), parts.timestamp, parts.user, parts.message));
-        }
-
-        return chatMessages;
     }
 
     private async Task<(SKContext context, SemanticFunctionConfig config)> GetKernelBuilder(IKernel kernel, string prompt)

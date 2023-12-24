@@ -8,7 +8,7 @@
 @inject IWebAssemblyHostEnvironment env;
 @inject HttpClient Http;
 
-<PageTitle>AIbert</PageTitle>
+<PageTitle>AIbert v0.7.2</PageTitle>
 
 <MudText Typo="Typo.h2">Chat with AIbert</MudText>
 
@@ -24,20 +24,6 @@
             <MudSlider @bind-Value="topP" T="decimal" Min="0.0m" Max="1.0m" Step="0.1m" TickMarks="true" Color="Color.Primary">Top P: @topP.ToString()</MudSlider>
         </p>
 
-        @*<MudText Typo="Typo.h4">Example responses</MudText>
-        <p><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddExampleResponse">+ Add example response</MudButton></p>
-        <ul>
-            @foreach (var response in exampleResponses)
-            {
-                <li>
-                    @((MarkupString)Regex.Replace(
-                        HttpUtility.HtmlEncode(@response.question), "\r?\n|\r", "<br />"))
-                    <br />
-                    @((MarkupString)Regex.Replace(
-                        HttpUtility.HtmlEncode(@response.answer), "\r?\n|\r", "<br />"))
-                </li>
-            }
-        </ul>*@
         <p>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettings">Save settings</MudButton>
             @if (isSaving)
@@ -45,17 +31,27 @@
                 <MudText>Saving...</MudText>
             }
         </p>
+
+        <MudText Typo="Typo.h4">Threads</MudText>
+        <p>
+            @threadsList
+        </p>
     </MudItem>
 
     <MudItem md="6" xs="12">
         <MudText Typo="Typo.h4">Participants</MudText>
+        <p>ThreadId: @threadId</p>
         <p>
             <MudTextField T="string" Label="From (You): Participant 1" Variant="Variant.Outlined" @bind-Value="sender" />
             <MudButton ButtonType="ButtonType.Button" Color="Color.Surface" Variant="Variant.Filled" OnClick="SwapParticipants">Swap</MudButton>
             <MudTextField T="string" Label="To: Participant 2" Variant="Variant.Outlined" @bind-Value="participant2" />
         </p>
+        <p>
+            <MudButton ButtonType="ButtonType.Button" Color="Color.Primary" Variant="Variant.Filled" OnClick="GetThread">Get/Create Thread</MudButton>
+        </p>
 
         <MudText Typo="Typo.h4">Your Message</MudText>
+        <p hidden="@threadId != string.Empty">You must start a thread before you can chat.</p>
         <p>
             <MudTextField T="string" Label="Ask something..." @bind-Value="prompt" Variant="Variant.Outlined" Lines="3" />
         </p>
@@ -101,12 +97,13 @@
         </div>
 
         <MudText Typo="Typo.h4">Thread</MudText>
+        <p>AIbert to respond in: @timerCountdown</p>
         @foreach (var chat in chatHistory)
         {
-            var chatParts = chat.Split("::");
-            <p class="chat @((chat.Contains("AIbert:") ? "chat--aibert" : ""))">
-                <span class="chat--person">@chatParts[0]</span>: @((MarkupString)Regex.Replace(
-                    HttpUtility.HtmlEncode(@chatParts[1]), "\r?\n|\r", "<br />"))
+            var chatParts = chat.message.Split("::");
+            <p class="chat @((chat.userId.Contains("AIbert:") ? "chat--aibert" : ""))">
+                <span class="chat--person">@string.Format("{0} {1}", chat.timestamp, chat.userId)</span>: @((MarkupString)Regex.Replace(
+                    HttpUtility.HtmlEncode(chat.message), "\r?\n|\r", "<br />"))
             </p>
         }
 
@@ -123,12 +120,41 @@
     private bool isSaving = true;
     private bool isSending = false;
     private bool hasPendingMessages = false;
+    private const int timerCountdownSet = 30;
+    private int timerCountdown = timerCountdownSet;
 
     private string baseUrl = "/api/";
 
+    private string threadId = string.Empty;
     private List<(string question, string answer)> exampleResponses = new();
-    private List<string> chatHistory = new();
-    private List<Promise> promises = new();
+    private IList<Chat> chatHistory = new List<Chat>();
+    private IList<Promise> promises = new List<Promise>();
+    private string threadsList = string.Empty;
+
+    private static System.Timers.Timer aTimer;
+
+    public void StartTimer()
+    {
+        aTimer = new System.Timers.Timer(1000);
+        aTimer.Elapsed += CountDownTimer;
+        aTimer.Enabled = true;
+    }
+
+    public async void CountDownTimer(Object source, System.Timers.ElapsedEventArgs e)
+    {
+        if (timerCountdown > 0)
+        {
+            timerCountdown -= 1;
+        }
+        else
+        {
+            timerCountdown = timerCountdownSet;
+            if (hasPendingMessages || isSending) return;
+            await GetChat();
+        }
+
+        StateHasChanged();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -136,14 +162,9 @@
             baseUrl = "http://localhost:7143/api/";
 
         await GetSettings();
-
-        var timer = new System.Threading.Timer(async _ =>
-        {
-            if (hasPendingMessages || isSending) return;
-            await GetChat();
-            StateHasChanged();
-        }, null, 0, 5000);
         await GetChat();
+        await GetThreads();
+        StartTimer();
 
         base.OnInitialized();
     }
@@ -199,8 +220,8 @@
     private void AddChat()
     {
         if (prompt.Length == 0) return;
-        var date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        chatHistory.Add($"{date} {sender}:: {prompt}");
+        var date = DateTime.Now;
+        chatHistory.Add(new Chat(Guid.NewGuid(), prompt, sender, date));
         prompt = string.Empty;
         hasPendingMessages = true;
     }
@@ -209,7 +230,7 @@
     {
         AddChat();
 
-        ChatInput input = new(chatHistory);
+        ChatInput input = new(new ChatThread(chatHistory, promises));
 
         isSending = true;
 
@@ -230,14 +251,20 @@
 
     private async Task GetChat()
     {
+        if (string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(participant2))
+        {
+            return;
+        }
+
         isSending = true;
 
         try
         {
-            var res = await Http.GetStringAsync($"{baseUrl}Chat");
+            var res = await Http.GetStringAsync($"{baseUrl}Chat/{threadId}");
             var chatRes = JsonSerializer.Deserialize<ChatResponse>(res);
-            chatHistory = chatRes?.thread ?? new();
-            promises = chatRes?.promises ?? new();
+            threadId = chatRes?.thread?.threadId ?? string.Empty;
+            chatHistory = chatRes?.thread?.chats ?? new List<Chat>();
+            promises = chatRes?.thread?.promises ?? new List<Promise>();
         }
         catch (Exception ex)
         {
@@ -249,11 +276,45 @@
         }
     }
 
+    private async Task GetThread()
+    {
+        if (string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(participant2))
+        {
+            return;
+        }
+
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"{baseUrl}Thread", new List<string>() { sender, participant2 });
+            threadId = await res.Content.ReadAsStringAsync();
+            await ClearChat();
+            await ClearPromises();
+            await GetChat();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    private async Task GetThreads()
+    {
+        try
+        {
+            var res = await Http.GetStringAsync($"{baseUrl}Thread");
+            // threadsList = res;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
     private async Task ClearChat()
     {
         try
         {
-            using var res = await Http.DeleteAsync($"{baseUrl}Chat");
+            // using var res = await Http.DeleteAsync($"{baseUrl}Thread/{threadId}");
             chatHistory.Clear();
         }
         catch (Exception ex)
@@ -266,7 +327,7 @@
     {
         try
         {
-            using var res = await Http.DeleteAsync($"{baseUrl}Promise");
+            // using var res = await Http.DeleteAsync($"{baseUrl}Promise");
             promises.Clear();
         }
         catch (Exception ex)
@@ -278,11 +339,11 @@
     private void AddScenario1()
     {
         var date = DateTime.Now.AddMinutes(-45);
-        chatHistory.Add($"{date.ToString("yyyy-MM-dd HH:mm:ss")} Nick:: Hey, how are you doing?");
-        chatHistory.Add($"{date.AddMinutes(5).ToString("yyyy-MM-dd HH:mm:ss")} Brian:: good, you?");
-        chatHistory.Add($"{date.AddMinutes(10).ToString("yyyy-MM-dd HH:mm:ss")} Nick:: Can you get me that report tomorrow?");
-        chatHistory.Add($"{date.AddMinutes(15).ToString("yyyy-MM-dd HH:mm:ss")} Brian:: Sure, what time?");
-        chatHistory.Add($"{date.AddMinutes(20).ToString("yyyy-MM-dd HH:mm:ss")} Nick:: around 9pm");
-        chatHistory.Add($"{date.AddMinutes(25).ToString("yyyy-MM-dd HH:mm:ss")} Brian:: sounds good");
+        chatHistory.Add(new Chat(Guid.NewGuid(), "Hey, how are you doing?", "Nick", date));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "good, you?", "Brian", date.AddMinutes(5)));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "Can you get me that report tomorrow?", "Nick", date.AddMinutes(10)));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "Sure, what time?", "Brian", date.AddMinutes(15)));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "around 9pm", "Nick", date.AddMinutes(20)));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "sounds good", "Brian", date.AddMinutes(25)));
     }
 }
