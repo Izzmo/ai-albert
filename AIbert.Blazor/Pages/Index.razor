@@ -68,6 +68,7 @@
 
         <p>
             <MudButton Color="Color.Success" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" IconColor="Color.Success" OnClick="AddScenario1">Scenario 1 chats</MudButton>
+            <MudButton Color="Color.Success" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" IconColor="Color.Success" OnClick="AddScenario2">Scenario 2 chats</MudButton>
         </p>
 
         @if (isSending)
@@ -101,7 +102,7 @@
         @foreach (var chat in chatHistory)
         {
             var chatParts = chat.message.Split("::");
-            <p class="chat @((chat.userId.Contains("AIbert:") ? "chat--aibert" : ""))">
+            <p class="chat @((chat.userId.Contains("AIbert") ? "chat--aibert" : ""))">
                 <span class="chat--person">@string.Format("{0} {1}", chat.timestamp, chat.userId)</span>: @((MarkupString)Regex.Replace(
                     HttpUtility.HtmlEncode(chat.message), "\r?\n|\r", "<br />"))
             </p>
@@ -345,5 +346,12 @@
         chatHistory.Add(new Chat(Guid.NewGuid(), "Sure, what time?", "Brian", date.AddMinutes(15)));
         chatHistory.Add(new Chat(Guid.NewGuid(), "around 9pm", "Nick", date.AddMinutes(20)));
         chatHistory.Add(new Chat(Guid.NewGuid(), "sounds good", "Brian", date.AddMinutes(25)));
+    }
+
+    private void AddScenario2()
+    {
+        var date = DateTime.Now.AddMinutes(-45);
+        chatHistory.Add(new Chat(Guid.NewGuid(), "Hey, can you let me know when you are coming over tomorrow?", "dude1", date));
+        chatHistory.Add(new Chat(Guid.NewGuid(), "Yep, no problem.", "dude2", date.AddMinutes(5)));
     }
 }
