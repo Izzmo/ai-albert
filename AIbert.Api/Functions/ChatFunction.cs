@@ -53,6 +53,7 @@ public class ChatFunction
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
     private readonly TableStorageService<ThreadEntity> _tableStorageService;
+    private static string _debugLog = string.Empty;
 
     public ChatFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
@@ -98,7 +99,7 @@ public class ChatFunction
         var threadEntity = (await _tableStorageService.SearchEntitiesAsync(x => x.RowKey == threadId)).First();
         var thread = threadEntity.ConvertTo();
         await ShouldRespond(thread);
-        await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse(thread)));
+        await response.WriteStringAsync(JsonSerializer.Serialize(new ChatResponse(thread, _debugLog)));
 
         return response;
     }
@@ -132,6 +133,7 @@ public class ChatFunction
             var bot_answer = await ask.InvokeAsync(context);
             _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} AIbert:: {bot_answer}");
             var answer = JsonSerializer.Deserialize<Answer>(bot_answer.ToString());
+            _debugLog = bot_answer.ToString();
             context.Variables.Update(string.Join("\n", thread.chats, "\nAIbert: ", answer, "\n"));
 
             if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))

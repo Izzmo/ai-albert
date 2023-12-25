@@ -108,6 +108,10 @@
             </p>
         }
 
+        <MudText Typo="Typo.h4">Debug log</MudText>
+        <p class="chat">
+            @((MarkupString)Regex.Replace(HttpUtility.HtmlEncode(debugLog), "\r?\n|\r", "<br />"))
+        </p>
     </MudItem>
 </MudGrid>
 
@@ -131,6 +135,7 @@
     private IList<Chat> chatHistory = new List<Chat>();
     private IList<Promise> promises = new List<Promise>();
     private string threadsList = string.Empty;
+    private string debugLog = string.Empty;
 
     private static System.Timers.Timer aTimer;
 
@@ -264,6 +269,7 @@
             var res = await Http.GetStringAsync($"{baseUrl}Chat/{threadId}");
             var chatRes = JsonSerializer.Deserialize<ChatResponse>(res);
             threadId = chatRes?.thread?.threadId ?? string.Empty;
+            debugLog = chatRes?.debugLog ?? string.Empty;
             chatHistory = chatRes?.thread?.chats ?? new List<Chat>();
             promises = chatRes?.thread?.promises ?? new List<Promise>();
         }
