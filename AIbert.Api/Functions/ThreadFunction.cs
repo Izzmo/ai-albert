@@ -17,7 +17,7 @@ public class ThreadFunction
 
     public ThreadFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
-        _logger = loggerFactory.CreateLogger<ChatFunction>();
+        _logger = loggerFactory.CreateLogger<ThreadFunction>();
         _config = config;
         _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
     }
