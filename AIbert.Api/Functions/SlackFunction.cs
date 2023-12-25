@@ -22,6 +22,7 @@ public class SlackFunction
     public async Task<HttpResponseData> HandleSlackEvent([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "slack")] HttpRequestData req)
     {
         var body = await new StreamReader(req.Body).ReadToEndAsync();
+        _logger.LogInformation(body);
 
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
