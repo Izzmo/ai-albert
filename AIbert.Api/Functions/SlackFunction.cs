@@ -29,8 +29,11 @@ public class SlackFunction
 
         switch (GetEventType(body))
         {
-            case SlackEventType.url_verification:
-                await GetChallenge(body, response);
+            case SlackEventType.UrlVerification:
+                await HandleChallenge(body, response);
+                break;
+            case SlackEventType.InstantMessage:
+                await HandleInstantMessage(body, response);
                 break;
             default:
                 break;
@@ -43,10 +46,15 @@ public class SlackFunction
     {
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var data = JsonSerializer.Deserialize<EventType>(body, options);
-        return Enum.Parse<SlackEventType>(data.Type);
+
+        return data.Type switch
+        {
+            "url_verification" => SlackEventType.UrlVerification,
+            "event_callback" => SlackEventType.InstantMessage
+        };
     }
 
-    private static async Task GetChallenge(string body, HttpResponseData response)
+    private static async Task HandleChallenge(string body, HttpResponseData response)
     {
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var data = JsonSerializer.Deserialize<ChallengeEvent>(body, options);
@@ -54,9 +62,17 @@ public class SlackFunction
         await response.WriteStringAsync(data.Challenge);
     }
 
+    private async Task HandleInstantMessage(string body, HttpResponseData response)
+    {
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var data = JsonSerializer.Deserialize<EventCallbackEvent>(body, options);
+
+    }
+
     private enum SlackEventType
     {
-        url_verification,
+        UrlVerification,
+        InstantMessage,
     }
 
     private class EventType
@@ -68,5 +84,21 @@ public class SlackFunction
     {
         public string Token { get; set; } = string.Empty;
         public string Challenge { get; set; } = string.Empty;
+    }
+
+    private class EventCallbackEvent
+    {
+        public InstantMessageEvent Event { get; set; }
+    }
+
+    private class InstantMessageEvent
+    {
+        public string Type { get; set; }
+        public string Channel { get; set; }
+        public string User { get; set; }
+        public string Text { get; set; }
+        public string Ts { get; set; }
+        public string Event_Ts { get; set; }
+        public string Channel_Type { get; set; }
     }
 }
