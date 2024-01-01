@@ -1,4 +1,4 @@
-﻿using AIbert.Api.Functions;
+﻿using AIbert.Api.Core;
 using AIbert.Api.Services;
 using AIbert.Models;
 using Microsoft.Extensions.Logging;
@@ -22,7 +22,7 @@ public class MessageHandler
         _logger.LogInformation("Adding chat to thread lookup {threadLookupId}: {message}", threadLookupId, message);
 
         var threadEntity = _threadService.SearchEntitiesAsync(x => x.PartitionKey == threadLookupId).Result.FirstOrDefault();
-        threadEntity ??= new ThreadEntity();
+        threadEntity ??= new ThreadEntity(threadLookupId, threadLookupId);
 
         var thread = threadEntity.ConvertTo();
         thread.chats.Add(new Chat(Guid.NewGuid(), message, userId, date));

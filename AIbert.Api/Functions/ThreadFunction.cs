@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using AIbert.Api.Core;
 using AIbert.Api.Services;
 using AIbert.Models;
 using Microsoft.Azure.Functions.Worker;

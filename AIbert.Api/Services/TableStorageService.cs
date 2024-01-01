@@ -10,6 +10,15 @@ public class BaseEntity : ITableEntity
     public string RowKey { get; set; } = string.Empty;
     public DateTimeOffset? Timestamp { get; set; }
     public ETag ETag { get; set; }
+
+    public BaseEntity()
+    { }
+
+    public BaseEntity(string partitionKey, string rowKey)
+    {
+        PartitionKey = partitionKey;
+        RowKey = rowKey;
+    }
 }
 
 public class TableStorageService<T> where T : BaseEntity

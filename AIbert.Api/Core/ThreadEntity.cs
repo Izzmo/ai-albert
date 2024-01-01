@@ -2,13 +2,20 @@
 using AIbert.Api.Services;
 using AIbert.Models;
 
-namespace AIbert.Api.Functions;
+namespace AIbert.Api.Core;
 
 public class ThreadEntity : BaseEntity
 {
     public string Users { get; set; } = string.Empty;
     public string Chats { get; set; } = string.Empty;
     public string Promises { get; set; } = string.Empty;
+
+    public ThreadEntity()
+    { }
+
+    public ThreadEntity(string partitionKey, string rowKey)
+        : base(partitionKey, rowKey)
+    { }
 
     public static ThreadEntity ConvertFromChatThread(ChatThread thread)
     {
