@@ -1,5 +1,8 @@
 using System.Net;
 using System.Text.Json;
+using AIbert.Api.Services;
+using AIbert.Core;
+using AIbert.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -10,19 +13,20 @@ namespace AIbert.Api.Functions;
 public class SlackFunction
 {
     private readonly ILogger _logger;
-    private readonly IConfiguration _config;
+    private readonly MessageHandler _messageHandler;
 
     public SlackFunction(ILoggerFactory loggerFactory, IConfiguration config)
     {
         _logger = loggerFactory.CreateLogger<SlackFunction>();
-        _config = config;
+        var tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
+        _messageHandler = new MessageHandler(loggerFactory, tableStorageService);
     }
 
     [Function(nameof(HandleSlackEvent))]
     public async Task<HttpResponseData> HandleSlackEvent([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "slack")] HttpRequestData req)
     {
         var body = await new StreamReader(req.Body).ReadToEndAsync();
-        _logger.LogInformation(body);
+        _logger.LogInformation("Slack message received: {body}", body);
 
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
@@ -67,6 +71,18 @@ public class SlackFunction
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var data = JsonSerializer.Deserialize<EventCallbackEvent>(body, options);
 
+        if (data == null)
+        {
+            _logger.LogError("Could not deserialize.");
+            return;
+        }
+
+        var chat = data.Event.Text;
+        var sender = data.Event.User;
+        var threadLookupId = data.Event.Channel;
+        var date = DateTimeOffset.FromUnixTimeSeconds(int.Parse(data.Event.Ts));
+
+        await _messageHandler.AddChatToThread(threadLookupId, sender, chat, date);
     }
 
     private enum SlackEventType

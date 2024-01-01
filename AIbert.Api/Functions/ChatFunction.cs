@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AIbert.Api.Services;
+using AIbert.Core;
 using AIbert.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -53,6 +54,7 @@ public class ChatFunction
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
     private readonly TableStorageService<ThreadEntity> _tableStorageService;
+    private readonly MessageHandler _messageHandler;
     private static string _debugLog = string.Empty;
 
     public ChatFunction(ILoggerFactory loggerFactory, IConfiguration config)
@@ -61,6 +63,7 @@ public class ChatFunction
         _config = config;
         _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
         _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
+        _messageHandler = new MessageHandler(loggerFactory, _tableStorageService);
     }
 
     [Function("Chat")]
@@ -80,7 +83,7 @@ public class ChatFunction
         try
         {
             data.thread.HasChangedSinceLastCheck = true;
-            await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(data.thread));
+            await _messageHandler.UpdateWholeThread(data.thread);
         }
         catch (Exception ex)
         {
