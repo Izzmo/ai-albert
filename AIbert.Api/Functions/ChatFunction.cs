@@ -14,39 +14,6 @@ using Microsoft.SemanticKernel.SemanticFunctions;
 namespace AIbert.Api.Functions;
 
 public record Answer(string promise, string promisor, string promiseHolder, string deadline, string response, string confirmed);
-public record ChatMessage(Guid MessageId, DateTime Timestamp, string User, string Message)
-{
-    public override string ToString()
-    {
-        return $"{Timestamp:yyyy-MM-dd HH:mm:ss} {User}:: {Message}";
-    }
-}
-
-public class ThreadEntity : BaseEntity
-{
-    public string Users { get; set; } = string.Empty;
-    public string Chats { get; set; } = string.Empty;
-    public string Promises { get; set; } = string.Empty;
-
-    public static ThreadEntity ConvertFromChatThread(ChatThread thread)
-    {
-        return new ThreadEntity
-        {
-            PartitionKey = thread.threadId,
-            RowKey = thread.threadId,
-            Users = JsonSerializer.Serialize(thread.users),
-            Chats = JsonSerializer.Serialize(thread.chats),
-            Promises = JsonSerializer.Serialize(thread.promises),
-        };
-    }
-
-    public ChatThread ConvertTo()
-    {
-        return new ChatThread(
-            JsonSerializer.Deserialize<IList<Chat>>(Chats),
-            JsonSerializer.Deserialize<IList<Promise>>(Promises));
-    }
-}
 
 public class ChatFunction
 {
