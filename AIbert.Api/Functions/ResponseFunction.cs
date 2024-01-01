@@ -30,7 +30,7 @@ namespace AIbert.Api.Functions
 
         [Function("ResponseFunction")]
         //public async Task Run([TimerTrigger("0 */5 * * * *")] Microsoft.Azure.WebJobs.TimerInfo myTimer)
-        public async Task<HttpResponseData> TimerTriggerAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "CheckChats")] HttpRequestData req)
+        public async Task<HttpResponseData> TimerTriggerAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "CheckChats")] HttpRequestData req)
         {
             //if (myTimer.ScheduleStatus is not null)
             //{
