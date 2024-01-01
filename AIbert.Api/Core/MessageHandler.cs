@@ -35,4 +35,12 @@ public class MessageHandler
         _logger.LogInformation("Update whole thread {threadId}: {message}", thread.threadId, JsonSerializer.Serialize(thread));
         await _threadService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
     }
+
+    public async Task<IEnumerable<ChatThread>> GetAllThreads()
+    {
+        var threadEntities = await _threadService.GetEntitiesAsync();
+        var threads = threadEntities.Select(x => x.ConvertTo()) ?? new List<ChatThread>();
+
+        return threads;
+    }
 }
