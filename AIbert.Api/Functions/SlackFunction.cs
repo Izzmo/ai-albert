@@ -80,7 +80,7 @@ public class SlackFunction
         var chat = data.Event.Text;
         var sender = data.Event.User;
         var threadLookupId = data.Event.Channel;
-        var date = DateTimeOffset.FromUnixTimeSeconds(int.Parse(data.Event.Ts));
+        var date = DateTimeOffset.FromUnixTimeSeconds((long)decimal.Parse(data.Event.Ts));
 
         await _messageHandler.AddChatToThread(threadLookupId, sender, chat, date);
     }
