@@ -21,10 +21,11 @@ public class MessageHandler
     {
         _logger.LogInformation("Adding chat to thread lookup {threadLookupId}: {message}", threadLookupId, message);
 
-        var threadEntity = _threadService.SearchEntitiesAsync(x => x.PartitionKey == threadLookupId).Result.FirstOrDefault();
+        var threadEntity = (await _threadService.SearchEntitiesAsync(x => x.PartitionKey == threadLookupId)).FirstOrDefault();
         threadEntity ??= new ThreadEntity(threadLookupId, threadLookupId);
 
         var thread = threadEntity.ConvertTo();
+        thread.threadId = threadLookupId;
         thread.chats.Add(new Chat(Guid.NewGuid(), message, userId, date));
         await _threadService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
     }

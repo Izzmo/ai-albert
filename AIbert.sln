@@ -9,7 +9,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Blazor", "AIbert.Bla
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Models", "AIbert.Models\AIbert.Models.csproj", "{35B9E0AB-EB1D-4E55-84E3-D27A5985E19C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AIbert.Tests", "AIbert.Tests\AIbert.Tests.csproj", "{223D1CAB-DF80-4E7A-84E3-3F0765DC4959}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AIbert.Tests", "AIbert.Tests\AIbert.Tests.csproj", "{223D1CAB-DF80-4E7A-84E3-3F0765DC4959}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution items", "Solution items", "{0F96ACD3-05B5-4CE5-AFCE-04516A4FB3A3}"
+	ProjectSection(SolutionItems) = preProject
+		.env = .env
+		.gitignore = .gitignore
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

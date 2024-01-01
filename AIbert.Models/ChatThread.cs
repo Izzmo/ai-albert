@@ -6,7 +6,7 @@ namespace AIbert.Models;
 
 public record ChatThread(IList<Chat> chats, IList<Promise> promises)
 {
-    public string threadId => GetThreadIdFromUsers(users);
+    public string threadId = string.Empty;
 
     [JsonIgnore]
     public IEnumerable<string> users => chats.Select(c => c.userId.ToLowerInvariant()).Where(c => c != "aibert").Distinct();

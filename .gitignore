@@ -402,3 +402,6 @@ FodyWeavers.xsd
 # Azurite
 *__azurite*
 *__blobstorage__*
+
+# TODO Files
+TODO*.*
