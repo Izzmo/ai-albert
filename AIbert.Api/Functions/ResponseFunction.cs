@@ -42,6 +42,8 @@ namespace AIbert.Api.Functions
                 {
                     _logger.LogInformation("Checking thread {threadId}", thread.threadId);
 
+                    if (thread.threadId != "C06CRRNGG3A") continue;
+
                     var lastChat = thread.chats.LastOrDefault();
                     if (lastChat?.userId != "AIbert" && lastChat?.timestamp < timeCutoff)
                     {
