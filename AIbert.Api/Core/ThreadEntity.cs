@@ -31,9 +31,13 @@ public class ThreadEntity : BaseEntity
 
     public ChatThread ConvertTo()
     {
-        return new ChatThread(
+        ChatThread chatThread = new(
             Chats.Length > 0 ? JsonSerializer.Deserialize<IList<Chat>>(Chats) : new List<Chat>(),
             Promises.Length > 0 ? JsonSerializer.Deserialize<IList<Promise>>(Promises) : new List<Promise>()
         );
+        
+        chatThread.threadId = PartitionKey;
+
+        return chatThread;
     }
 }

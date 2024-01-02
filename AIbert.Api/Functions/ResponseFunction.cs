@@ -40,6 +40,8 @@ namespace AIbert.Api.Functions
                 var threads = await _messageHandler.GetAllThreads();
                 foreach (var thread in threads)
                 {
+                    _logger.LogInformation("Checking thread {threadId}", thread.threadId);
+
                     var lastChat = thread.chats.LastOrDefault();
                     if (lastChat?.userId != "AIbert" && lastChat?.timestamp < timeCutoff)
                     {
