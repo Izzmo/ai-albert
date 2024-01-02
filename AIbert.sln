@@ -15,6 +15,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.env = .env
 		.gitignore = .gitignore
+		.github\workflows\azure-static-web-apps-wonderful-field-0503d9e10.yml = .github\workflows\azure-static-web-apps-wonderful-field-0503d9e10.yml
 		README.md = README.md
 	EndProjectSection
 EndProject
