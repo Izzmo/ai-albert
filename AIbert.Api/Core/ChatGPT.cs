@@ -47,6 +47,7 @@ public class ChatGPT
         {
             var bot_answer = await ask.InvokeAsync(context);
             var bot_answer_string = bot_answer.ToString();
+
             _logger.LogInformation($"Should AIbert respond? {bot_answer_string}");
 
             if (bot_answer_string.Contains("confirmed"))
