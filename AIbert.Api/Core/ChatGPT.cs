@@ -15,14 +15,13 @@ public class ChatGPT
     private readonly ILogger _logger;
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
-    private readonly TableStorageService<ThreadEntity> _tableStorageService;
+    private const string isThereAPromisePrompt = "A [promise] is defined as an agreement or a commitment where one party is the [promiseHolder] looking for a [promiser] to commit to a promise.  Each and every [promise] will have its own [description] and [deadline].  Oftentimes one or both of these elements aren’t clear. Your 1st job, after every communication message, is to determine in a percentage of confidence, if a new promise has been created or is in the process of being created.  \r\nYour confidence percentage should be measured by the intent of each message and whether or not they seem to be working out the description and the deadline of a promise.\r\nIf you are <20% confident there is no promise being created, say nothing.\r\nIf you are >20% confident but <80% confident there is a promise being created, the question you should ask the thread is: “Is this a promise you want me to track?”  \r\nIf you are >80% confident => run the general prompt";
 
     public ChatGPT(ILoggerFactory loggerFactory, IConfiguration config)
     {
         _logger = loggerFactory.CreateLogger<ChatFunction>();
         _config = config;
         _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
-        _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
     }
 
     public async Task ShouldRespond(ChatThread thread)
@@ -36,7 +35,7 @@ public class ChatGPT
         _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
 
         IKernel kernel = GetKernel();
-        string skPrompt = "Given the chat history below, is there a promise being made by someone? If there is a promise, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
+        string skPrompt = isThereAPromisePrompt;
         var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
@@ -58,7 +57,6 @@ public class ChatGPT
             {
                 thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
                 thread.HasChangedSinceLastCheck = true;
-                //await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
             }
         }
         catch (Exception ex)
@@ -97,8 +95,6 @@ public class ChatGPT
                 {
                     thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
                 }
-
-                //await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
             }
         }
         catch (Exception ex)
