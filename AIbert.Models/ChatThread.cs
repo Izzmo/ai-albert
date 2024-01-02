@@ -8,9 +8,6 @@ public record ChatThread(IList<Chat> chats, IList<Promise> promises)
 {
     public string threadId = string.Empty;
 
-    [JsonIgnore]
-    public IEnumerable<string> users => chats.Select(c => c.userId.ToLowerInvariant()).Where(c => c != "aibert").Distinct();
-
     public bool HasChangedSinceLastCheck = false;
 
     public void AddChat(Chat newChat)
