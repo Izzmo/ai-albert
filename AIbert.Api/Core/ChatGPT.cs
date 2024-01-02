@@ -36,7 +36,7 @@ public class ChatGPT
         _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
 
         IKernel kernel = GetKernel();
-        string skPrompt = "Given the chat history below, is there a promise being made? You will know it is clear because it will mention a promisee, promise keeper, description of the promise, and the deadline of the promise. If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
+        string skPrompt = "Given the chat history below, is there a promise being made by someone? If there is a promise, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
         var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
