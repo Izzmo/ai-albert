@@ -78,7 +78,7 @@ public class SlackFunction
         }
 
         var chat = data.Event.Text;
-        var sender = data.Event.User;
+        var sender = data.Event.Bot_Id == null ? data.Event.User : "AIbert";
         var threadLookupId = data.Event.Channel;
         var date = DateTimeOffset.FromUnixTimeSeconds((long)decimal.Parse(data.Event.Ts));
 
@@ -110,8 +110,10 @@ public class SlackFunction
     private class InstantMessageEvent
     {
         public string Type { get; set; }
+        public string SubType { get; set; }
         public string Channel { get; set; }
         public string User { get; set; }
+        public string Bot_Id { get; set; }
         public string Text { get; set; }
         public string Ts { get; set; }
         public string Event_Ts { get; set; }
