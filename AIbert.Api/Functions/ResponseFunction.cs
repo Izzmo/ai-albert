@@ -64,7 +64,7 @@ namespace AIbert.Api.Functions
                                 {
                                     { HttpRequestHeader.ContentType.ToString(), "application/json" }
                                 },
-                                RequestUri = new Uri($"https://hooks.slack.com/services/${_slackToken}"),
+                                RequestUri = new Uri($"https://hooks.slack.com/services/{_slackToken}"),
                                 Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
                             };
 
