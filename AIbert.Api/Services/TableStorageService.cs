@@ -34,7 +34,7 @@ public class TableStorageService<T> where T : BaseEntity
 
     public async Task<IEnumerable<T>> GetEntitiesAsync()
     {
-        return await SearchEntitiesAsync(x => !string.IsNullOrWhiteSpace(x.PartitionKey));
+        return await SearchEntitiesAsync(x => x.PartitionKey != string.Empty);
     }
 
     public async Task<IEnumerable<T>> SearchEntitiesAsync(Expression<Func<T, bool>> searchExp)
