@@ -58,7 +58,7 @@ public class ChatGPT
             {
                 thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
                 thread.HasChangedSinceLastCheck = true;
-                await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
+                //await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
             }
         }
         catch (Exception ex)
@@ -98,7 +98,7 @@ public class ChatGPT
                     thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
                 }
 
-                await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
+                //await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
             }
         }
         catch (Exception ex)
