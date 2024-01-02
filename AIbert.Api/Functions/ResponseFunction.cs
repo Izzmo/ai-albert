@@ -51,6 +51,8 @@ namespace AIbert.Api.Functions
                         
                         if (thread.chats.Count > numChatsPrevious)
                         {
+                            _logger.LogInformation("Found new chat, sending to Slack.");
+
                             var body = new
                             {
                                 text = thread.chats.Last().message
@@ -58,6 +60,10 @@ namespace AIbert.Api.Functions
                             var request = new HttpRequestMessage
                             {
                                 Method = HttpMethod.Post,
+                                Headers =
+                                {
+                                    { HttpRequestHeader.ContentType.ToString(), "application/json" }
+                                },
                                 RequestUri = new Uri($"https://hooks.slack.com/services/${_slackToken}"),
                                 Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
                             };
