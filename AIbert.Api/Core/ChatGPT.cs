@@ -8,144 +8,165 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
-namespace AIbert.Api.Core
-{
-    public class ChatGPT
-    {
-        private readonly ILogger _logger;
-        private readonly IConfiguration _config;
-        private readonly BlobStorageService _blobStorageService;
-        private readonly TableStorageService<ThreadEntity> _tableStorageService;
+namespace AIbert.Api.Core;
 
-        public ChatGPT(ILoggerFactory loggerFactory, IConfiguration config)
+public class ChatGPT
+{
+    private readonly ILogger _logger;
+    private readonly IConfiguration _config;
+    private readonly BlobStorageService _blobStorageService;
+    private readonly TableStorageService<ThreadEntity> _tableStorageService;
+
+    public ChatGPT(ILoggerFactory loggerFactory, IConfiguration config)
+    {
+        _logger = loggerFactory.CreateLogger<ChatFunction>();
+        _config = config;
+        _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
+        _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
+    }
+
+    public async Task ShouldRespond(ChatThread thread)
+    {
+        if (thread.HasChangedSinceLastCheck || !TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
         {
-            _logger = loggerFactory.CreateLogger<ChatFunction>();
-            _config = config;
-            _blobStorageService = new BlobStorageService(config.GetValue<string>("StorageAccountConnectionString"), "config");
-            _tableStorageService = new TableStorageService<ThreadEntity>(config.GetValue<string>("StorageAccountConnectionString"), "threads");
+            _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
+            return;
         }
 
-        public async Task ShouldRespond(ChatThread thread)
+        _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
+
+        IKernel kernel = GetKernel();
+        string skPrompt = "Given the chat history below, is there a promise being made? You will know it is clear because it will mention a promisee, promise keeper, description of the promise, and the deadline of the promise. If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
+        var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
+
+        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
+
+        context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
+
+        try
         {
-            if (thread.HasChangedSinceLastCheck || !TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
+            var bot_answer = await ask.InvokeAsync(context);
+            var bot_answer_string = bot_answer.ToString();
+            _logger.LogInformation($"Should AIbert respond? {bot_answer_string}");
+
+            if (bot_answer_string.Contains("confirmed"))
             {
-                _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
-                return;
-            }
-
-            _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
-
-            IKernel kernel = GetKernel();
-            string skPrompt = "Given the chat history below, is there a promise being made? If so, do you know the promisee, promise keeper, description of the promise, and the deadline of the promise? If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
-            var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
-
-            var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
-
-            context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
-
-            try
-            {
-                var bot_answer = await ask.InvokeAsync(context);
-                _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} should respond? AIbert:: {bot_answer}");
                 await Chat(thread);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Error in parsing bot answer");
+                thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
+                thread.HasChangedSinceLastCheck = true;
             }
         }
-
-        private async Task Chat(ChatThread thread)
+        catch (Exception ex)
         {
-            IKernel kernel = GetKernel();
-            var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
-            var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
+            _logger.LogError(ex, "Error in parsing bot answer");
+        }
+    }
 
-            var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
+    private async Task Chat(ChatThread thread)
+    {
+        IKernel kernel = GetKernel();
+        var prompt = await _blobStorageService.GetSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find sysem prompt in blob.");
+        var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
-            context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
+        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
-            var participants = new List<string>();
-            thread.chats.ToList().ForEach(t => participants.Add(t.userId));
-            context.Variables["participants"] = string.Join(",", participants.Distinct());
+        context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
 
-            try
+        var participants = new List<string>();
+        thread.chats.ToList().ForEach(t => participants.Add(t.userId));
+        context.Variables["participants"] = string.Join(",", participants.Distinct());
+
+        try
+        {
+            var bot_answer = await ask.InvokeAsync(context);
+            _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} AIbert:: {bot_answer}");
+            var answer = JsonSerializer.Deserialize<Answer>(bot_answer.ToString());
+            context.Variables.Update(string.Join("\n", thread.chats, "\nAIbert: ", answer, "\n"));
+
+            if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))
             {
-                var bot_answer = await ask.InvokeAsync(context);
-                _logger.LogInformation($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} AIbert:: {bot_answer}");
-                var answer = JsonSerializer.Deserialize<Answer>(bot_answer.ToString());
-                context.Variables.Update(string.Join("\n", thread.chats, "\nAIbert: ", answer, "\n"));
+                thread.chats.Add(new Chat(Guid.Empty, answer.response, "AIbert", DateTime.Now));
+                thread.HasChangedSinceLastCheck = true;
 
-                if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))
+                if (answer?.confirmed.ToLower() == "true")
                 {
-                    thread.chats.Add(new Chat(Guid.Empty, answer.response, "AIbert", DateTime.Now));
-                    thread.HasChangedSinceLastCheck = true;
-
-                    if (answer?.confirmed.ToLower() == "true")
-                    {
-                        thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
-                    }
-
-                    await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
+                    thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in parsing bot answer");
-            }
 
-            context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(thread.promises)}";
+                await _tableStorageService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
+            }
         }
-
-        private bool TimeBufferHasBeenReached(Chat? lastMessage)
+        catch (Exception ex)
         {
-            if (lastMessage == null)
-            {
-                _logger.LogInformation("Not repsonding yet: no messages.");
-                return false;
-            }
-
-            if (Guid.Empty == lastMessage.chatId)
-            {
-                _logger.LogInformation("Not repsonding yet: Last message is AIbert.");
-                return false;
-            }
-
-            _logger.LogInformation("{0} <= {1}", lastMessage.timestamp, DateTime.Now.AddSeconds(-15));
-            return lastMessage.timestamp <= DateTime.Now.AddSeconds(-15);
+            _logger.LogError(ex, "Error in parsing bot answer");
         }
 
-        private async Task<(SKContext context, SemanticFunctionConfig config)> GetKernelBuilder(IKernel kernel, string prompt)
+        context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(thread.promises)}";
+    }
+
+    private bool TimeBufferHasBeenReached(Chat? lastMessage)
+    {
+        if (lastMessage == null)
         {
-            var topP = await _blobStorageService.GetTopP();
-            var temperature = await _blobStorageService.GetTemperature();
-            var promptConfig = new PromptTemplateConfig
-            {
-                Completion =
-            {
-                MaxTokens = 2000,
-                Temperature = (double)temperature,
-                TopP = (double)topP,
-            }
-            };
-            string skPrompt = @$"{prompt}";
-            var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
-            var functionConfig = new SemanticFunctionConfig(promptConfig, promptTemplate);
-
-            return (kernel.CreateNewContext(), functionConfig);
+            _logger.LogInformation("Not repsonding yet: no messages.");
+            return false;
         }
 
-        private IKernel GetKernel()
+        if (Guid.Empty == lastMessage.chatId)
         {
-            var builder = new KernelBuilder();
-
-            builder.WithOpenAIChatCompletionService(
-                     "gpt-3.5-turbo",
-                     _config.GetValue<string>("OpenAiKey"));
-
-            var kernel = builder.Build();
-            return kernel;
+            _logger.LogInformation("Not repsonding yet: Last message is AIbert.");
+            return false;
         }
 
+        _logger.LogInformation("{0} <= {1}", lastMessage.timestamp, DateTime.Now.AddSeconds(-15));
+        return lastMessage.timestamp <= DateTime.Now.AddSeconds(-15);
+    }
+
+    private async Task<(SKContext context, SemanticFunctionConfig config)> GetKernelBuilder(IKernel kernel, string prompt)
+    {
+        var topP = await _blobStorageService.GetTopP();
+        var temperature = await _blobStorageService.GetTemperature();
+        var promptConfig = new PromptTemplateConfig
+        {
+            Completion =
+        {
+            MaxTokens = 2000,
+            Temperature = (double)temperature,
+            TopP = (double)topP,
+        }
+        };
+        string skPrompt = @$"{prompt}";
+        var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
+        var functionConfig = new SemanticFunctionConfig(promptConfig, promptTemplate);
+
+        return (kernel.CreateNewContext(), functionConfig);
+    }
+
+    private IKernel GetKernel()
+    {
+        var builder = new KernelBuilder();
+
+        builder.WithOpenAIChatCompletionService(
+                    "gpt-3.5-turbo",
+                    _config.GetValue<string>("OpenAiKey"));
+
+        var kernel = builder.Build();
+        return kernel;
+    }
+}
+
+public class ChatGPTSystemPromptNotFoundException : Exception
+{
+    public ChatGPTSystemPromptNotFoundException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatGPTSystemPromptNotFoundException(string message, Exception exception)
+        : base(message, exception)
+    {
     }
 }
