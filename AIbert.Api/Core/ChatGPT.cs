@@ -48,15 +48,15 @@ public class ChatGPT
 
             _logger.LogInformation($"Should AIbert respond? {bot_answer_string}");
 
-            //if (bot_answer_string.Contains("confirmed"))
-            //{
-            //    await Chat(thread);
-            //}
-            //else
-            //{
+            if (bot_answer_string.Contains("confirmed"))
+            {
+                await Chat(thread);
+            }
+            else
+            {
                 thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
                 thread.HasChangedSinceLastCheck = true;
-            //}
+            }
         }
         catch (Exception ex)
         {
