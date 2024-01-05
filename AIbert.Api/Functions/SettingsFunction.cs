@@ -27,10 +27,11 @@ public class SettingsFunction
 
         try
         {
+            var systemPrompt = await _blobStorageService.GetInitialSystemPrompt() ?? string.Empty;
             var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
             var topP = await _blobStorageService.GetTopP();
             var temperature = await _blobStorageService.GetTemperature();
-            Settings settings = new(prompt, topP, temperature);
+            Settings settings = new(systemPrompt, prompt, topP, temperature);
             
             await response.WriteAsJsonAsync(settings);
         }
@@ -54,8 +55,14 @@ public class SettingsFunction
             return req.CreateResponse(HttpStatusCode.BadRequest);
         }
 
+        if (string.IsNullOrWhiteSpace(data.InitialSystemPrompt))
+        {
+            return req.CreateResponse(HttpStatusCode.BadRequest);
+        }
+
         try
         {
+            await _blobStorageService.SaveInitialSystemPrompt(data.InitialSystemPrompt);
             await _blobStorageService.SaveSystemPrompt(data.SystemPrompt);
             await _blobStorageService.SaveTopP(data.TopP);
             await _blobStorageService.SaveTemperature(data.Temperature);
