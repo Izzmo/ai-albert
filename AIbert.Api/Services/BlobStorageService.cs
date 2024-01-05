@@ -12,6 +12,9 @@ public class BlobStorageService
         _client = new BlobContainerClient(connectionString, containerName);
     }
 
+    public Task<string> GetInitialSystemPrompt()
+        => Get("initial-system-prompt.txt");
+
     public Task<string> GetSystemPrompt()
         => Get("system-prompt.txt");
 

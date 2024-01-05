@@ -15,8 +15,6 @@ public class ChatGPT
     private readonly ILogger _logger;
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
-    private const string isThereAPromisePrompt = @"A [promise] is defined as an agreement or a commitment where one party is the [promiseHolder] looking for a [promiser] to commit to a promise.  Each and every [promise] will have its own [description] and [deadline].  Oftentimes one or both of these elements aren't clear. Your 1st job, after every communication message, is to determine in a percentage of confidence, if a new promise has been created or is in the process of being created. Your [confidence] is measured as a percentage of confidence that intent of each message and whether or not they seem to be working out the description and the deadline of a promise.  What is your confidence that the message thread below contains a promise? Give us your [confidence] score. \n\nHistory:\n{{$history}}";
-        //@"A [promise] is defined as an agreement or a commitment where one party is the [promiseHolder] looking for a [promiser] to commit to a promise.  Each and every [promise] will have its own [description] and [deadline].  Oftentimes one or both of these elements aren’t clear. Your 1st job, after every communication message, is to determine in a percentage of confidence, if a new promise has been created or is in the process of being created. Your confidence percentage should be measured by the intent of each message and whether or not they seem to be working out the description and the deadline of a promise. If you are <20% confident there is no promise being created, say ""There is not promise here."". If you are >20% confident but <80% confident there is a promise being created, the question you should ask the thread is: ""Is this a promise you want me to track?"" If you are >80% confident => ""confirmed"".\n\nHistory:\n{{$history}}";
 
     public ChatGPT(ILoggerFactory loggerFactory, IConfiguration config)
     {
@@ -36,8 +34,8 @@ public class ChatGPT
         _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
 
         IKernel kernel = GetKernel();
-        string skPrompt = isThereAPromisePrompt;
-        var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
+        var prompt = await _blobStorageService.GetInitialSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find initial system prompt in blob.");
+        var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
@@ -69,7 +67,7 @@ public class ChatGPT
     private async Task Chat(ChatThread thread)
     {
         IKernel kernel = GetKernel();
-        var prompt = await _blobStorageService.GetSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find sysem prompt in blob.");
+        var prompt = await _blobStorageService.GetSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find system prompt in blob.");
         var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
         var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
