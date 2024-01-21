@@ -92,6 +92,7 @@ public class ChatGPT
 
                 if (answer?.confirmed.ToLower() == "true")
                 {
+                    _logger.LogInformation("Adding promise to thread: {promise}", answer.promise);
                     thread.promises.Add(new Promise(Guid.Empty, answer.promise, answer.deadline, answer.promisor, answer.promiseHolder));
                 }
             }
@@ -147,7 +148,7 @@ public class ChatGPT
         var builder = new KernelBuilder();
 
         builder.WithOpenAIChatCompletionService(
-                    "gpt-3.5-turbo",
+                    "gpt-3.5-turbo-16k",
                     _config.GetValue<string>("OpenAiKey"));
 
         var kernel = builder.Build();
