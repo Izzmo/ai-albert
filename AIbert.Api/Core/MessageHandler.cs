@@ -30,6 +30,19 @@ public class MessageHandler
         await _threadService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
     }
 
+    public async Task AddPromiseToThread(string threadLookupId, Promise promise)
+    {
+        _logger.LogInformation("Adding promise to thread lookup {threadLookupId}: {Description}, Deadline: {Deadline}, PromiseHolder: {PromiseHolder}, Promiser: {Promiser}", threadLookupId, promise.Description, promise.Deadline, promise.PromiseHolder, promise.Promiser);
+
+        var threadEntity = (await _threadService.SearchEntitiesAsync(x => x.PartitionKey == threadLookupId)).FirstOrDefault();
+        threadEntity ??= new ThreadEntity(threadLookupId, threadLookupId);
+
+        var thread = threadEntity.ConvertTo();
+        thread.threadId = threadLookupId;
+        thread.promises.Add(promise);
+        await _threadService.AddRow(ThreadEntity.ConvertFromChatThread(thread));
+    }
+
     public async Task UpdateWholeThread(ChatThread thread)
     {
         _logger.LogInformation("Update whole thread {threadId}: {message}", thread.threadId, JsonSerializer.Serialize(thread));

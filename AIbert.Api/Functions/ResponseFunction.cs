@@ -1,6 +1,7 @@
 using AIbert.Api.Core;
 using AIbert.Api.Services;
 using AIbert.Core;
+using AIbert.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -29,7 +30,7 @@ namespace AIbert.Api.Functions
         }
 
         [Function("ResponseFunction")]
-        public async Task<HttpResponseData> TimerTriggerAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "CheckChats")] HttpRequestData req)
+        public async Task<HttpResponseData> ResponseFunctionAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "CheckChats")] HttpRequestData req)
         {
             var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-30);
             var threads = await _messageHandler.GetAllThreads();
@@ -42,45 +43,67 @@ namespace AIbert.Api.Functions
                 {
                     _logger.LogInformation("Thread {threadId} has not been updated in 30 seconds. Sending to AIbert.", thread.threadId);
                     var numChatsPrevious = thread.chats.Count;
+                    var numPromisesPrevious = thread.promises.Count;
                     await _chatGPT.ShouldRespond(thread);
-                        
-                    if (thread.chats.Count > numChatsPrevious)
-                    {
-                        _logger.LogInformation("Found new chat, sending to Slack.");
-                        
-                        var body = new
-                        {
-                            channel = thread.threadId,
-                            text = thread.chats.Last().message
-                        };
-                        var request = new HttpRequestMessage
-                        {
-                            Method = HttpMethod.Post,
-                            Headers =
-                            {
-                                { HttpRequestHeader.ContentType.ToString(), "application/json; charset=utf-8" },
-                                { HttpRequestHeader.Authorization.ToString(), $"Bearer {_slackToken}" }
-                            },
-                            RequestUri = new Uri($"https://slack.com/api/chat.postMessage"),
-                            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
-                        };
 
-                        try
-                        {
-                            using var res = await _client.SendAsync(request);
-                            res.EnsureSuccessStatusCode();
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.LogError(e, "Error sending chat to Slack"); 
-                        }
-                    }
+                    await CheckNewMessage(thread, numChatsPrevious);
+                    await CheckNewPromise(thread, numPromisesPrevious);
                 }
             }
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
             return response;
+        }
+
+        private async Task CheckNewMessage(ChatThread thread, int numChatsPrevious)
+        {
+            if (thread.chats.Count == numChatsPrevious)
+                return;
+
+            _logger.LogInformation("Found new chat, sending to Slack.");
+
+            var body = new
+            {
+                channel = thread.threadId,
+                text = thread.chats.Last().message
+            };
+            var request = new HttpRequestMessage
+            {
+                Method = HttpMethod.Post,
+                Headers =
+                        {
+                            { HttpRequestHeader.ContentType.ToString(), "application/json; charset=utf-8" },
+                            { HttpRequestHeader.Authorization.ToString(), $"Bearer {_slackToken}" }
+                        },
+                RequestUri = new Uri($"https://slack.com/api/chat.postMessage"),
+                Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+            };
+
+            try
+            {
+                using var res = await _client.SendAsync(request);
+                res.EnsureSuccessStatusCode();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error sending chat to Slack");
+            }
+        }
+
+        private async Task CheckNewPromise(ChatThread thread, int numPromisesPrevious)
+        {
+            if (thread.chats.Count == numPromisesPrevious)
+                return;
+
+            try
+            {
+                await _messageHandler.AddPromiseToThread(thread.threadId, thread.promises.Last());
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error saving promise.");
+            }
         }
     }
 }
