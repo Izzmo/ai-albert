@@ -33,10 +33,10 @@ public class SlackFunction
 
         switch (GetEventType(body))
         {
-            case SlackEventType.UrlVerification:
+            case SlackMessageType.UrlVerification:
                 await HandleChallenge(body, response);
                 break;
-            case SlackEventType.InstantMessage:
+            case SlackMessageType.InstantMessage:
                 await HandleInstantMessage(body, response);
                 break;
             default:
@@ -46,16 +46,28 @@ public class SlackFunction
         return response;
     }
 
-    private static SlackEventType GetEventType(string body)
+    private SlackMessageType GetEventType(string body)
     {
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var data = JsonSerializer.Deserialize<EventType>(body, options);
 
-        return data.Type switch
+        if (data == null)
         {
-            "url_verification" => SlackEventType.UrlVerification,
-            "event_callback" => SlackEventType.InstantMessage
-        };
+           _logger.LogWarning("Could not determine event type.");
+            return SlackMessageType.Unknown;
+        }
+
+        if (data.Type == "url_verification")
+        {
+            return SlackMessageType.UrlVerification;
+        }
+
+        if (data.Type == "event_callback")
+        {
+            return SlackMessageType.InstantMessage;
+        }
+
+        return SlackMessageType.Unknown;
     }
 
     private static async Task HandleChallenge(string body, HttpResponseData response)
@@ -78,17 +90,23 @@ public class SlackFunction
         }
 
         var chat = data.Event.Text;
-        var sender = data.Event.Bot_Id == null ? data.Event.User : "AIbert";
+        var sender = data.Event.Bot_Id == null ? data.Event.User : data.Event.Bot_Profile.Name;
         var threadLookupId = data.Event.Channel;
         var date = DateTimeOffset.FromUnixTimeSeconds((long)decimal.Parse(data.Event.Ts));
 
         await _messageHandler.AddChatToThread(threadLookupId, sender, chat, date);
     }
 
-    private enum SlackEventType
+    private enum SlackMessageType
     {
+        Unknown,
         UrlVerification,
         InstantMessage,
+    }
+
+    private enum SlackEventType
+    {
+        message,
     }
 
     private class EventType
@@ -114,9 +132,16 @@ public class SlackFunction
         public string Channel { get; set; }
         public string User { get; set; }
         public string Bot_Id { get; set; }
+        public Bot_Profile Bot_Profile { get; set; }
         public string Text { get; set; }
         public string Ts { get; set; }
         public string Event_Ts { get; set; }
         public string Channel_Type { get; set; }
+    }
+
+    private class Bot_Profile
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
     }
 }

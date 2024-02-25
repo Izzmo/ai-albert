@@ -29,53 +29,55 @@ namespace AIbert.Api.Functions
         }
 
         [Function("ResponseFunction")]
-        //public async Task Run([TimerTrigger("0 */5 * * * *")] Microsoft.Azure.WebJobs.TimerInfo myTimer)
         public async Task<HttpResponseData> TimerTriggerAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "CheckChats")] HttpRequestData req)
         {
-            //if (myTimer.ScheduleStatus is not null)
-            //{
-                //_logger.LogInformation($"Next timer schedule at: {myTimer.ScheduleStatus.Next}");
+            var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-30);
+            var threads = await _messageHandler.GetAllThreads();
+            foreach (var thread in threads)
+            {
+                _logger.LogInformation("Checking thread {threadId}", thread.threadId);
 
-                var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-30);
-                var threads = await _messageHandler.GetAllThreads();
-                foreach (var thread in threads)
+                var lastChat = thread.chats.LastOrDefault();
+                if (lastChat?.userId != "AIbert" && lastChat?.timestamp < timeCutoff)
                 {
-                    _logger.LogInformation("Checking thread {threadId}", thread.threadId);
-
-                    if (thread.threadId != "C06CRRNGG3A") continue;
-
-                    var lastChat = thread.chats.LastOrDefault();
-                    if (lastChat?.userId != "AIbert" && lastChat?.timestamp < timeCutoff)
-                    {
-                        _logger.LogInformation("Thread {threadId} has not been updated in 30 seconds. Sending to AIbert.", thread.threadId);
-                        var numChatsPrevious = thread.chats.Count;
-                        await _chatGPT.ShouldRespond(thread);
+                    _logger.LogInformation("Thread {threadId} has not been updated in 30 seconds. Sending to AIbert.", thread.threadId);
+                    var numChatsPrevious = thread.chats.Count;
+                    await _chatGPT.ShouldRespond(thread);
                         
-                        if (thread.chats.Count > numChatsPrevious)
+                    if (thread.chats.Count > numChatsPrevious)
+                    {
+                        _logger.LogInformation("Found new chat, sending to Slack.");
+
+                        var body = new
                         {
-                            _logger.LogInformation("Found new chat, sending to Slack.");
-
-                            var body = new
+                            token = _slackToken,
+                            channel = thread.threadId,
+                            text = thread.chats.Last().message
+                        };
+                        var request = new HttpRequestMessage
+                        {
+                            Method = HttpMethod.Post,
+                            Headers =
                             {
-                                text = thread.chats.Last().message
-                            };
-                            var request = new HttpRequestMessage
-                            {
-                                Method = HttpMethod.Post,
-                                Headers =
-                                {
-                                    { HttpRequestHeader.ContentType.ToString(), "application/json" }
-                                },
-                                RequestUri = new Uri($"https://hooks.slack.com/services/{_slackToken}"),
-                                Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
-                            };
+                                { HttpRequestHeader.ContentType.ToString(), "application/json" }
+                            },
+                            RequestUri = new Uri($"https://slack.com/api/chat.postMessage"),
+                            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+                        };
 
+                        try
+                        {
                             using var res = await _client.SendAsync(request);
                             res.EnsureSuccessStatusCode();
                         }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e, "Error sending chat to Slack"); 
+                        }
                     }
                 }
-            //}
+            }
+
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
             return response;
