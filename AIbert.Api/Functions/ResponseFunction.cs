@@ -47,12 +47,11 @@ namespace AIbert.Api.Functions
                     if (thread.chats.Count > numChatsPrevious)
                     {
                         _logger.LogInformation("Found new chat, sending to Slack.");
-
-                        var text = System.Web.HttpUtility.UrlEncode(thread.chats.Last().message);
+                        
                         var body = new
                         {
                             channel = thread.threadId,
-                            text
+                            text = thread.chats.Last().message
                         };
                         var request = new HttpRequestMessage
                         {
