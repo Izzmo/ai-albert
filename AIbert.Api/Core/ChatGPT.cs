@@ -48,7 +48,7 @@ public class ChatGPT
 
             _logger.LogInformation($"Should AIbert respond? {bot_answer_string}");
 
-            if (bot_answer_string.Contains("confirmed"))
+            if (bot_answer_string.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
             {
                 await Chat(thread);
             }
