@@ -48,11 +48,10 @@ namespace AIbert.Api.Functions
                     {
                         _logger.LogInformation("Found new chat, sending to Slack.");
 
+                        var text = System.Web.HttpUtility.UrlEncode(thread.chats.Last().message);
                         var body = new
                         {
-                            token = _slackToken,
-                            channel = thread.threadId,
-                            text = thread.chats.Last().message
+                            token = _slackToken
                         };
                         var request = new HttpRequestMessage
                         {
@@ -61,7 +60,7 @@ namespace AIbert.Api.Functions
                             {
                                 { HttpRequestHeader.ContentType.ToString(), "application/json" }
                             },
-                            RequestUri = new Uri($"https://slack.com/api/chat.postMessage"),
+                            RequestUri = new Uri($"https://slack.com/api/chat.postMessage?channel={thread.threadId}&text={text}"),
                             Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
                         };
 
