@@ -87,7 +87,7 @@ namespace AIbert.Api.Functions
 
         private async Task CheckNewPromise(ChatThread thread, int numPromisesPrevious)
         {
-            if (thread.chats.Count == numPromisesPrevious)
+            if (thread.promises.Count == numPromisesPrevious)
                 return;
 
             try
