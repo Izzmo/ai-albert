@@ -47,7 +47,7 @@ public class ChatGPT
             return;
         }
 
-        if (lastChat?.timestamp < timeCutoff)
+        if (lastChat?.timestamp >= timeCutoff)
         {
             _logger.LogInformation("Not repsonding yet: Time buffer not passed. {timestamp} < {timeCutoff}", lastChat.timestamp, timeCutoff);
             return;
