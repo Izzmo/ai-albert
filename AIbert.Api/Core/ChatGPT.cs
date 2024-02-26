@@ -53,7 +53,7 @@ public class ChatGPT
         var prompt = await _blobStorageService.GetInitialSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find initial system prompt in blob.");
         var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
-        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
+        var ask = kernel.RegisterSemanticFunction("AIbert", "CheckContext", functionConfig);
 
         context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
 
@@ -126,14 +126,13 @@ public class ChatGPT
         var prompt = await _blobStorageService.GetPromisePrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find system prompt in blob.");
         var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
-        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
+        var ask = kernel.RegisterSemanticFunction("AIbert", "CheckPromise", functionConfig);
 
         context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
         context.Variables["promises"] = JsonSerializer.Serialize(thread.promises);
 
         try
         {
-
             var bot_answer = await ask.InvokeAsync(context);
             var bot_answer_string = bot_answer.ToString();
 
@@ -144,7 +143,7 @@ public class ChatGPT
                 _logger.LogInformation("Confirming new promise.");
             }
 
-            if (bot_answer_string.Contains("fulfilled", StringComparison.OrdinalIgnoreCase))
+            if (bot_answer_string.Contains("fulfill", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Fulfulling promise.");
             }

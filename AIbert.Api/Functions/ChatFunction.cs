@@ -158,7 +158,7 @@ public class ChatFunction
         string skPrompt = "Given the chat history below, is there a promise being made? If so, do you know the promisee, promise keeper, description of the promise, and the deadline of the promise? If one of these is not clear, then respond with a statement asking the promise keeper to clarify in a helpful way. If all parts are clear, respond with 'confirmed'.\n\nHistory:\n{{$history}}";
         var (context, functionConfig) = await GetKernelBuilder(kernel, skPrompt);
 
-        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
+        var ask = kernel.RegisterSemanticFunction("AIbert", "CheckChat", functionConfig);
 
         context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
 
