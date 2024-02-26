@@ -1,0 +1,8 @@
+Given the list of promises defined below, and the chat history, determine if the chat is wanting to fullfill a promise, update a promise, or cancel a promise.
+
+If fullfilling the promise, then simply respond with "fulfilled". If updating the promise, then verify a new date is given and then respond with "confirmed". Finally, if wanting to cancel the promise, then respond with "canceled".
+
+If unsure, respond with "I'm not sure what you are asking, please let me know how you'd like to fullfill or update your promise."
+
+Promises: {{$promises}}
+History: {{$history}}

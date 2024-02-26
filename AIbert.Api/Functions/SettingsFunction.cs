@@ -29,9 +29,10 @@ public class SettingsFunction
         {
             var systemPrompt = await _blobStorageService.GetInitialSystemPrompt() ?? string.Empty;
             var prompt = await _blobStorageService.GetSystemPrompt() ?? string.Empty;
+            var promisePrompt = await _blobStorageService.GetPromisePrompt() ?? string.Empty;
             var topP = await _blobStorageService.GetTopP();
             var temperature = await _blobStorageService.GetTemperature();
-            Settings settings = new(systemPrompt, prompt, topP, temperature);
+            Settings settings = new(systemPrompt, prompt, promisePrompt, topP, temperature);
             
             await response.WriteAsJsonAsync(settings);
         }
@@ -64,6 +65,7 @@ public class SettingsFunction
         {
             await _blobStorageService.SaveInitialSystemPrompt(data.InitialSystemPrompt);
             await _blobStorageService.SaveSystemPrompt(data.SystemPrompt);
+            await _blobStorageService.SavePromisePrompt(data.PromisePrompt);
             await _blobStorageService.SaveTopP(data.TopP);
             await _blobStorageService.SaveTemperature(data.Temperature);
         }

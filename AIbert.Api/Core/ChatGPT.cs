@@ -12,6 +12,7 @@ namespace AIbert.Api.Core;
 
 public class ChatGPT
 {
+    private const int TimeBuffer = 30;
     private readonly ILogger _logger;
     private readonly IConfiguration _config;
     private readonly BlobStorageService _blobStorageService;
@@ -25,13 +26,28 @@ public class ChatGPT
 
     public async Task ShouldRespond(ChatThread thread)
     {
-        if (thread.HasChangedSinceLastCheck || !TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
+        var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-TimeBuffer);
+        var lastChat = thread.chats.LastOrDefault();
+
+        if (thread.promises.Count > 0)
+        {
+            if (lastChat?.userId == "AIbert")
+            {
+                _logger.LogInformation("Found promises, but AIbert is last response.");
+                return;
+            }
+
+            await PromiseResponse(thread);
+            return;
+        }
+
+        if (lastChat?.userId == "AIbert" || lastChat?.timestamp < timeCutoff)
         {
             _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
             return;
         }
 
-        _logger.LogInformation("Acknowledging message: {0}", thread.chats.Last().chatId);
+        _logger.LogInformation("Thread {threadId} has not been updated in {TimeBuffer} seconds. Sending to AIbert.", thread.threadId, TimeBuffer);
 
         IKernel kernel = GetKernel();
         var prompt = await _blobStorageService.GetInitialSystemPrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find initial system prompt in blob.");
@@ -55,7 +71,6 @@ public class ChatGPT
             else
             {
                 thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
-                thread.HasChangedSinceLastCheck = true;
             }
         }
         catch (Exception ex)
@@ -88,7 +103,6 @@ public class ChatGPT
             if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))
             {
                 thread.chats.Add(new Chat(Guid.Empty, answer.response, "AIbert", DateTime.Now));
-                thread.HasChangedSinceLastCheck = true;
 
                 if (answer?.confirmed.ToLower() == "true")
                 {
@@ -105,22 +119,47 @@ public class ChatGPT
         context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(thread.promises)}";
     }
 
-    private bool TimeBufferHasBeenReached(Chat? lastMessage)
+
+    private async Task PromiseResponse(ChatThread thread)
     {
-        if (lastMessage == null)
-        {
-            _logger.LogInformation("Not repsonding yet: no messages.");
-            return false;
-        }
+        IKernel kernel = GetKernel();
+        var prompt = await _blobStorageService.GetPromisePrompt() ?? throw new ChatGPTSystemPromptNotFoundException("Could not find system prompt in blob.");
+        var (context, functionConfig) = await GetKernelBuilder(kernel, prompt);
 
-        if (Guid.Empty == lastMessage.chatId)
-        {
-            _logger.LogInformation("Not repsonding yet: Last message is AIbert.");
-            return false;
-        }
+        var ask = kernel.RegisterSemanticFunction("AIbert", "Chat", functionConfig);
 
-        _logger.LogInformation("{0} <= {1}", lastMessage.timestamp, DateTime.Now.AddSeconds(-15));
-        return lastMessage.timestamp <= DateTime.Now.AddSeconds(-15);
+        context.Variables["history"] = JsonSerializer.Serialize(thread.chats);
+        context.Variables["promises"] = JsonSerializer.Serialize(thread.promises);
+
+        try
+        {
+
+            var bot_answer = await ask.InvokeAsync(context);
+            var bot_answer_string = bot_answer.ToString();
+
+            _logger.LogInformation($"Promise update response: {bot_answer_string}");
+
+            if (bot_answer_string.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Confirming new promise.");
+            }
+
+            if (bot_answer_string.Contains("fulfilled", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Fulfulling promise.");
+            }
+
+            if (bot_answer_string.Contains("canceled", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Canceling promise.");
+            }
+
+            thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in parsing bot answer");
+        }
     }
 
     private async Task<(SKContext context, SemanticFunctionConfig config)> GetKernelBuilder(IKernel kernel, string prompt)

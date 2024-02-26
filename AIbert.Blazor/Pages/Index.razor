@@ -15,9 +15,10 @@
 <MudGrid>
     <MudItem md="6" xs="12">
         <MudText Typo="Typo.h4">Settings</MudText>
-        <p><MudTextField T="string" Label="Initial Prompt" Variant="Variant.Outlined" @bind-Value="initialSystemPrompt" Lines="20" /></p>
+        <p><MudTextField T="string" Label="Initial Prompt" Variant="Variant.Outlined" @bind-Value="initialSystemPrompt" Lines="5" /></p>
         <p><MudTextField T="string" Label="System Prompt" Variant="Variant.Outlined" @bind-Value="systemPrompt" Lines="30" /></p>
-        
+        <p><MudTextField T="string" Label="Promise Prompt" Variant="Variant.Outlined" @bind-Value="promisePrompt" Lines="10" /></p>
+
         <p>
             <MudSlider @bind-Value="temperature" T="decimal" Min="0.0m" Max="2.0m" Step="0.1m" TickMarks="true" Color="Color.Primary">Temperature: @temperature.ToString()</MudSlider>
         </p>
@@ -122,6 +123,7 @@
     private string participant2 = string.Empty;
     private string initialSystemPrompt = string.Empty;
     private string systemPrompt = string.Empty;
+    private string promisePrompt = string.Empty;
     private decimal temperature = 0.0m;
     private decimal topP = 0.0m;
     private bool isSaving = true;
@@ -191,6 +193,7 @@
             var res = await Http.GetFromJsonAsync<Settings>($"{baseUrl}Settings");
             initialSystemPrompt = res?.InitialSystemPrompt ?? string.Empty;
             systemPrompt = res?.SystemPrompt ?? string.Empty;
+            promisePrompt = res?.PromisePrompt ?? string.Empty;
             topP = res?.TopP ?? 0.0m;
             temperature = res?.Temperature ?? 0.0m;
         }
@@ -206,7 +209,7 @@
 
     private async Task SaveSettings()
     {
-        Settings settings = new(initialSystemPrompt, systemPrompt, topP, temperature);
+        Settings settings = new(initialSystemPrompt, systemPrompt, promisePrompt, topP, temperature);
 
         isSaving = true;
 

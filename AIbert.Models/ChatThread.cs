@@ -1,14 +1,11 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Serialization;
 
 namespace AIbert.Models;
 
 public record ChatThread(IList<Chat> chats, IList<Promise> promises)
 {
     public string threadId = string.Empty;
-
-    public bool HasChangedSinceLastCheck = false;
 
     public void AddChat(Chat newChat)
     {

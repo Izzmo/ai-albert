@@ -1,3 +1,3 @@
 ﻿namespace AIbert.Models;
 
-public record Settings(string InitialSystemPrompt, string SystemPrompt, decimal TopP, decimal Temperature);
+public record Settings(string InitialSystemPrompt, string SystemPrompt, string PromisePrompt, decimal TopP, decimal Temperature);

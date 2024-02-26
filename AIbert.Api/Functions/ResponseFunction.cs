@@ -32,23 +32,17 @@ namespace AIbert.Api.Functions
         [Function("ResponseFunction")]
         public async Task<HttpResponseData> ResponseFunctionAsync([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "CheckChats")] HttpRequestData req)
         {
-            var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-30);
             var threads = await _messageHandler.GetAllThreads();
             foreach (var thread in threads)
             {
                 _logger.LogInformation("Checking thread {threadId}", thread.threadId);
 
-                var lastChat = thread.chats.LastOrDefault();
-                if (lastChat?.userId != "AIbert" && lastChat?.timestamp < timeCutoff)
-                {
-                    _logger.LogInformation("Thread {threadId} has not been updated in 30 seconds. Sending to AIbert.", thread.threadId);
-                    var numChatsPrevious = thread.chats.Count;
-                    var numPromisesPrevious = thread.promises.Count;
-                    await _chatGPT.ShouldRespond(thread);
-
-                    await CheckNewMessage(thread, numChatsPrevious);
-                    await CheckNewPromise(thread, numPromisesPrevious);
-                }
+                var numChatsPrevious = thread.chats.Count;
+                var numPromisesPrevious = thread.promises.Count;
+                
+                await _chatGPT.ShouldRespond(thread);
+                await CheckNewMessage(thread, numChatsPrevious);
+                await CheckNewPromise(thread, numPromisesPrevious);
             }
 
             var response = req.CreateResponse(HttpStatusCode.OK);

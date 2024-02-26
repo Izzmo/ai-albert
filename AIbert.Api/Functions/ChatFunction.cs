@@ -50,7 +50,6 @@ public class ChatFunction
 
         try
         {
-            data.thread.HasChangedSinceLastCheck = true;
             await _messageHandler.UpdateWholeThread(data.thread);
         }
         catch (Exception ex)
@@ -110,7 +109,6 @@ public class ChatFunction
             if (!string.IsNullOrEmpty(answer?.response) && !answer.response.ToLower().Contains("already confirmed"))
             {
                 thread.chats.Add(new Chat(Guid.Empty, answer.response, "AIbert", DateTime.Now));
-                thread.HasChangedSinceLastCheck = true;
 
                 if (answer?.confirmed.ToLower() == "true")
                 {
@@ -148,7 +146,7 @@ public class ChatFunction
 
     private async Task ShouldRespond(ChatThread thread)
     {
-        if (thread.HasChangedSinceLastCheck || !TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
+        if (!TimeBufferHasBeenReached(thread.chats.LastOrDefault()))
         {
             _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
             return;

@@ -18,11 +18,17 @@ public class BlobStorageService
     public Task<string> GetSystemPrompt()
         => Get("system-prompt.txt");
 
+    public Task<string> GetPromisePrompt()
+        => Get("promise-prompt.txt");
+
     public Task SaveInitialSystemPrompt(string newContent)
         => Save("initial-system-prompt.txt", newContent);
-    
+
     public Task SaveSystemPrompt(string newContent)
         => Save("system-prompt.txt", newContent);
+
+    public Task SavePromisePrompt(string newContent)
+        => Save("promise-prompt.txt", newContent);
 
     public async Task<decimal> GetTopP()
         => decimal.Parse(await Get("topp.txt"));
