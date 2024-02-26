@@ -75,7 +75,7 @@ public class SlackFunction
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var data = JsonSerializer.Deserialize<ChallengeEvent>(body, options);
 
-        await response.WriteStringAsync(data.Challenge);
+        await response.WriteStringAsync(data?.Challenge ?? string.Empty);
     }
 
     private async Task HandleInstantMessage(string body, HttpResponseData response)
