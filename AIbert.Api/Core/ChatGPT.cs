@@ -26,7 +26,7 @@ public class ChatGPT
 
     public async Task ShouldRespond(ChatThread thread)
     {
-        var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(-TimeBuffer);
+        var timeCutoff = DateTimeOffset.UtcNow.AddSeconds(0 - TimeBuffer);
         var lastChat = thread.chats.LastOrDefault();
 
         if (thread.promises.Count > 0)
@@ -41,9 +41,15 @@ public class ChatGPT
             return;
         }
 
-        if (lastChat?.userId == "AIbert" || lastChat?.timestamp < timeCutoff)
+        if (lastChat?.userId == "AIbert")
         {
-            _logger.LogInformation("Not repsonding yet: Time buffer not passed yet.");
+            _logger.LogInformation("Not repsonding: Last user is AIbert.");
+            return;
+        }
+
+        if (lastChat?.timestamp < timeCutoff)
+        {
+            _logger.LogInformation("Not repsonding yet: Time buffer not passed.");
             return;
         }
 
