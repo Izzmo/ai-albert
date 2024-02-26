@@ -169,11 +169,11 @@ public class ChatGPT
         var promptConfig = new PromptTemplateConfig
         {
             Completion =
-        {
-            MaxTokens = 2000,
-            Temperature = (double)temperature,
-            TopP = (double)topP,
-        }
+            {
+                MaxTokens = 2000,
+                Temperature = (double)temperature,
+                TopP = (double)topP,
+            }
         };
         string skPrompt = @$"{prompt}";
         var promptTemplate = new PromptTemplate(skPrompt, promptConfig, kernel);
