@@ -92,7 +92,10 @@ namespace AIbert.Api.Functions
 
             try
             {
-                await _messageHandler.AddPromiseToThread(thread.threadId, thread.promises.Last());
+                if (thread.promises.Count == 0)
+                    await _messageHandler.UpdateWholeThread(thread);
+                else
+                    await _messageHandler.AddPromiseToThread(thread.threadId, thread.promises.Last());
             }
             catch (Exception e)
             {

@@ -125,7 +125,6 @@ public class ChatGPT
         context.Variables["promises"] = $"Active Promises:\n{JsonSerializer.Serialize(thread.promises)}";
     }
 
-
     private async Task PromiseResponse(ChatThread thread)
     {
         IKernel kernel = GetKernel();
@@ -146,20 +145,26 @@ public class ChatGPT
 
             if (bot_answer_string.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogInformation("Confirming new promise.");
+                _logger.LogInformation("Updating promise. Clearing promises. Clearing history.");
+                thread.promises.Clear();
+                thread.chats.Add(new Chat(Guid.Empty, "How would you like to update the promise?", "AIbert", DateTime.Now));
             }
 
             if (bot_answer_string.Contains("fulfill", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogInformation("Fulfulling promise.");
+                _logger.LogInformation("Fulfulling promise. Clearing promises. Clearing history.");
+                thread.chats.Clear();
+                thread.promises.Clear();
+                thread.chats.Add(new Chat(Guid.Empty, "The promise has been fulfilled.", "AIbert", DateTime.Now));
             }
 
             if (bot_answer_string.Contains("canceled", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogInformation("Canceling promise.");
+                _logger.LogInformation("Canceling promise. Clearing history.");
+                thread.chats.Clear();
+                thread.promises.Clear();
+                thread.chats.Add(new Chat(Guid.Empty, "The promise has been canceled.", "AIbert", DateTime.Now));
             }
-
-            thread.chats.Add(new Chat(Guid.Empty, bot_answer_string, "AIbert", DateTime.Now));
         }
         catch (Exception ex)
         {
