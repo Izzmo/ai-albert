@@ -38,9 +38,13 @@ namespace AIbert.Api.Functions
                 foreach(var promise in thread.promises)
                 {
                     _logger.LogInformation("Checking thread {threadId}, Deadline: {deadline}", thread.threadId, promise.Deadline);
+                    
+                    var utcTime = DateTimeOffset.UtcNow;
+                    var pacificTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+                    var pacificTimeNow = TimeZoneInfo.ConvertTime(utcTime, pacificTimeZone);
 
                     var promiseDeadline = DateTimeOffset.Parse(promise.Deadline);
-                    if (promiseDeadline >= DateTimeOffset.UtcNow && promiseDeadline <= timeCutoff)
+                    if (promiseDeadline >= pacificTimeNow && promiseDeadline <= timeCutoff)
                     {
                         _logger.LogInformation("Thread {threadId} has a promise that is due soon. Sending to Slack.", thread.threadId);
 
